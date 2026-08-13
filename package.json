@@ -10,6 +10,9 @@
   "dependencies": {
     "kokoro-js": "^1.2.1"
   },
+  "overrides": {
+    "@huggingface/transformers": "^4.2.0"
+  },
   "devDependencies": {
     "esbuild": "^0.24.0"
   }

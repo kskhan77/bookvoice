@@ -61,4 +61,46 @@ const hook = (id, device, dtype) => {
 };
 hook("gpu32", "webgpu", "fp32");
 hook("gpu16", "webgpu", "fp16");
+hook("gpuq8", "webgpu", "q8");
 hook("wasmq8", "wasm", "q8");
+
+// Numeric quality check: Kokoro generation is deterministic, so a healthy
+// quantized waveform should correlate highly with fp32. Corruption shows up
+// as low correlation, clipping, or NaNs.
+async function compareWith(dtype) {
+  const gen = async (dt) => {
+    const m = await KokoroTTS.from_pretrained(
+      "onnx-community/Kokoro-82M-v1.0-ONNX",
+      { dtype: dt, device: "webgpu" }
+    );
+    const t0 = performance.now();
+    const a = await m.generate(TEXT, { voice: "af_heart" });
+    log(`  ${dt} gen in ${Math.round(performance.now() - t0)}ms (cold)`);
+    const t1 = performance.now();
+    const b = await m.generate(TEXT, { voice: "af_heart" });
+    log(`  ${dt} gen in ${Math.round(performance.now() - t1)}ms (warm)`);
+    return b.audio;
+  };
+  log(`--- comparing fp32 vs ${dtype} output`);
+  const ref = await gen("fp32");
+  const alt = await gen(dtype);
+  const n = Math.min(ref.length, alt.length);
+  let dot = 0, sr = 0, sa = 0, nan = 0, maxA = 0;
+  for (let i = 0; i < n; i++) {
+    const x = ref[i], y = alt[i];
+    if (Number.isNaN(y)) nan++;
+    else {
+      dot += x * y; sr += x * x; sa += y * y;
+      if (Math.abs(y) > maxA) maxA = Math.abs(y);
+    }
+  }
+  const corr = dot / Math.sqrt(sr * sa);
+  log(`  lengths ${ref.length} vs ${alt.length}, corr=${corr.toFixed(4)}, NaNs=${nan}, maxAbs=${maxA.toFixed(3)}`);
+  log(corr > 0.9 ? `  VERDICT: ${dtype} output is healthy` : `  VERDICT: ${dtype} output is CORRUPTED`);
+}
+document.getElementById("compare").addEventListener("click", () =>
+  compareWith("fp16").catch((e) => log("ERROR: " + (e.stack || e)))
+);
+document.getElementById("compareq4").addEventListener("click", () =>
+  compareWith("q4").catch((e) => log("ERROR: " + (e.stack || e)))
+);

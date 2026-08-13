@@ -4,6 +4,7 @@ node_modules/
 
 # Build output (regenerate with: npm run build)
 extension/dist/
+test/bundle.js
 
 # Store upload packages
 bookvoice-*.zip

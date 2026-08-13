@@ -351,18 +351,18 @@ async function loadModel() {
       if (!g || g.fallback || /swiftshader|llvmpipe|software/i.test(g.vendor + " " + g.arch)) {
         throw new Error("No hardware WebGPU adapter in this context");
       }
-      // fp16 is ~4x faster than fp32 on integrated GPUs (and half the
-      // download); on this class of hardware fp32 generates slower than
-      // real-time, which sounds like the extension "not reading".
-      await ensureModelCached("onnx/model_fp16.onnx");
+      // fp32 only: fp16 produces corrupted audio (NaNs/garbage) on Intel
+      // WebGPU drivers. With onnxruntime >= 1.26 (via transformers.js 4.x),
+      // fp32 runs ~1.7x real-time on integrated GPUs - fast enough.
+      await ensureModelCached("onnx/model.onnx");
       broadcast({ state: "loading", detail: "Loading model on GPU" });
       const t0 = performance.now();
       tts = await KokoroTTS.from_pretrained(MODEL_ID, {
-        dtype: "fp16",
+        dtype: "fp32",
         device: "webgpu",
         progress_callback,
       });
-      diag(`model loaded webgpu/fp16 in ${Math.round(performance.now() - t0)}ms`);
+      diag(`model loaded webgpu/fp32 in ${Math.round(performance.now() - t0)}ms`);
       ttsDevice = "webgpu";
     } catch (e) {
       diag("webgpu unavailable -> wasm: " + (e.message || e));
