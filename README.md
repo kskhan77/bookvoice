@@ -1,8 +1,27 @@
 # BookVoice — Natural Read-Aloud Chrome Extension
 
+> **Status:** v0.1.0 submitted to the Chrome Web Store — currently under
+> review (August 2026). Until it's published, install by loading the
+> `extension/` folder unpacked (instructions below).
+
 Reads web pages and ebooks (EBSCO EPUB viewer, articles, any HTML page) aloud
 with a **natural neural voice** — Kokoro-82M running 100% locally on your GPU
 via WebGPU. No cloud, no API keys, works offline after the first model download.
+
+## Roadmap
+
+- **More languages** — Urdu, Hindi, and others via Meta's MMS-TTS models
+  (local, in-browser), with automatic language detection and routing
+- **Translate-and-listen** — translate pages on-device (Chrome's built-in
+  Translator API) and read them aloud in your language
+- Click any paragraph to start reading from there
+- Export a chapter to MP3
+- Auto-continue to the next book section
+- Remember reading position per book
+- PDF support via a bundled text extractor
+
+Language and translation work will happen on the `feature/multilingual`
+branch; `main` stays matched to the version under store review.
 
 ## Install (load unpacked)
 
