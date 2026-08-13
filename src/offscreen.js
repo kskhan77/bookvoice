@@ -243,8 +243,14 @@ function report(extra = {}) {
     device: ttsDevice,
     current: session.played,
     total: session.chunks.length,
+    snippet: session.snippet || "",
     ...extra,
   });
+}
+
+// Must match the hash used by background.js when checking saved positions.
+function textHash(t) {
+  return t.length + ":" + t.slice(0, 50) + ":" + t.slice(-50);
 }
 
 async function loadModel() {
@@ -357,6 +363,8 @@ function playNext() {
     s.playingNow = false;
     if (s.doneProducing) {
       broadcast({ state: "done", device: ttsDevice, total: s.chunks.length });
+      // Finished this page: clear the saved position.
+      if (s.url) chrome.storage.local.remove("pos:" + s.url);
       session = null;
       relayHighlight("stop");
       releaseKeepAliveSoon();
@@ -370,11 +378,24 @@ function playNext() {
   src.buffer = buf;
   src.connect(ctx.destination);
   s.currentSrc = src;
+  s.snippet = s.chunks[item.index].slice(0, 90);
   relayHighlight("chunk", {
     text: s.chunks[item.index],
     duration: buf.duration,
     index: item.index,
   });
+  // Persist the reading position so the popup can offer "Resume".
+  if (s.url) {
+    chrome.storage.local.set({
+      ["pos:" + s.url]: {
+        index: item.index,
+        total: s.chunks.length,
+        hash: s.hash,
+        title: s.title || "",
+        savedAt: Date.now(),
+      },
+    });
+  }
   src.onended = () => {
     if (s.stopped) return;
     s.played = item.index + 1;
@@ -386,7 +407,7 @@ function playNext() {
 }
 
 async function produce(s) {
-  for (let i = 0; i < s.chunks.length; i++) {
+  for (let i = s.startAt; i < s.chunks.length; i++) {
     if (s.stopped) return;
     // Throttle generation to stay only LOOKAHEAD chunks ahead of playback.
     while (!s.stopped && i - s.played >= LOOKAHEAD) {
@@ -412,7 +433,7 @@ async function produce(s) {
   s.doneProducing = true;
 }
 
-async function startReading({ text, voice, speed }) {
+async function startReading({ text, voice, speed, url, title, resumeIndex }) {
   stopSession();
   startKeepAlive();
   await loadModel();
@@ -423,12 +444,18 @@ async function startReading({ text, voice, speed }) {
     broadcast({ state: "error", error: "No readable text found on the page." });
     return;
   }
+  const startAt = Math.min(Math.max(0, resumeIndex || 0), chunks.length - 1);
   session = {
     chunks,
     voice: voice || "af_heart",
     speed: Number(speed) || 1,
+    url: url || null,
+    title: title || "",
+    hash: textHash(text),
+    startAt,
+    snippet: "",
     queue: [],
-    played: 0,
+    played: startAt,
     playingNow: false,
     doneProducing: false,
     stopped: false,

@@ -1,5 +1,6 @@
-// Popup UI: extracts text from the active tab (all frames, so ebook viewers
-// rendered inside iframes work), sends it to the TTS engine, shows progress.
+// Popup UI: start/resume reading, bookmarks, progress. Text extraction and
+// reading orchestration live in background.js (so bookmarks can auto-start
+// after navigation); the popup just sends commands.
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
@@ -7,67 +8,23 @@ const fillEl = $("fill");
 const pauseBtn = $("pause");
 let paused = false;
 
-// Runs inside the page/frame. Prefers the user's selection, otherwise pulls
-// readable text from the main content area.
-function extractText() {
-  const sel = window.getSelection && window.getSelection().toString();
-  if (sel && sel.trim().length > 20) {
-    return { kind: "selection", text: sel.trim() };
-  }
-  const root =
-    document.querySelector('main, article, [role="main"]') || document.body;
-  if (!root) return { kind: "page", text: "" };
-  const clone = root.cloneNode(true);
-  clone
-    .querySelectorAll(
-      "script,style,noscript,nav,header,footer,aside,button,form,svg,figure figcaption"
-    )
-    .forEach((e) => e.remove());
-  const text = (clone.innerText || clone.textContent || "")
-    .replace(/[ \t]+/g, " ")
-    .trim();
-  return { kind: "page", text };
-}
-
-async function getPageText() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab");
-  const results = await chrome.scripting.executeScript({
-    target: { tabId: tab.id, allFrames: true },
-    func: extractText,
-  });
-  const values = results
-    .filter((r) => r?.result)
-    .map((r) => ({ ...r.result, frameId: r.frameId }));
-  // A selection anywhere wins; otherwise read the frame with the most text.
-  const best =
-    values.find((v) => v.kind === "selection") ||
-    values.sort((a, b) => b.text.length - a.text.length)[0];
-  if (!best || best.text.length < 40) {
-    throw new Error(
-      "Couldn't find readable text. If this is a PDF, BookVoice can't read Chrome's PDF viewer yet — try the EPUB view."
-    );
-  }
-  // Set up sentence/word highlighting inside the frame we'll be reading.
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id, frameIds: [best.frameId] },
-      files: ["highlighter.js"],
-    });
-  } catch (e) {
-    console.warn("Highlighter injection failed (reading continues):", e);
-  }
-  return { text: best.text, tabId: tab.id, frameId: best.frameId };
-}
-
 function send(cmd, extra = {}) {
   return chrome.runtime.sendMessage({ target: "bg", cmd, ...extra });
+}
+
+function prefs() {
+  const voice = $("voice").value;
+  const speed = $("speed").value;
+  chrome.storage.local.set({ voice, speed });
+  return { voice, speed };
 }
 
 function render(st) {
   if (!st) return;
   const dev =
     st.device === "webgpu" ? " · GPU" : st.device === "wasm" ? " · CPU" : "";
+  const reading = st.state === "playing" || st.state === "paused";
+  $("bmRow").style.display = reading ? "" : "none";
   switch (st.state) {
     case "idle":
       statusEl.textContent = "Ready. Select text or just hit Read page." + dev;
@@ -102,26 +59,71 @@ function render(st) {
   }
 }
 
+async function startReading(extra = {}) {
+  statusEl.textContent = "Starting…";
+  const r = await send("read-active-tab", { ...prefs(), ...extra });
+  if (r && r.ok === false) statusEl.textContent = "⚠ " + r.error;
+}
+
 $("speed").addEventListener("input", (e) => {
   $("speedVal").textContent = Number(e.target.value).toFixed(1) + "×";
 });
+$("read").addEventListener("click", () => startReading());
+$("resume").addEventListener("click", () => startReading({ resume: true }));
+pauseBtn.addEventListener("click", () => send(paused ? "resume" : "pause"));
+$("stop").addEventListener("click", () => send("stop"));
 
-$("read").addEventListener("click", async () => {
-  try {
-    statusEl.textContent = "Extracting text…";
-    const { text, tabId, frameId } = await getPageText();
-    const voice = $("voice").value;
-    const speed = $("speed").value;
-    chrome.storage.local.set({ voice, speed });
-    statusEl.textContent = "Starting…";
-    await send("start", { text, voice, speed, tabId, frameId });
-  } catch (e) {
-    statusEl.textContent = "⚠ " + (e.message || e);
+$("bookmark").addEventListener("click", async () => {
+  const r = await send("bookmark-current");
+  if (r?.ok) {
+    $("bookmark").textContent = "✓ Saved";
+    setTimeout(() => ($("bookmark").textContent = "🔖 Bookmark this spot"), 1200);
+    loadBookmarks();
+  } else {
+    statusEl.textContent = "⚠ " + (r?.error || "Could not bookmark");
   }
 });
 
-pauseBtn.addEventListener("click", () => send(paused ? "resume" : "pause"));
-$("stop").addEventListener("click", () => send("stop"));
+async function loadBookmarks() {
+  const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+  const list = $("bmList");
+  list.textContent = "";
+  $("bmSection").style.display = bookmarks.length ? "" : "none";
+  for (const b of bookmarks) {
+    const item = document.createElement("div");
+    item.className = "bm";
+    const info = document.createElement("div");
+    info.className = "bmInfo";
+    const title = document.createElement("div");
+    title.className = "bmTitle";
+    title.textContent = b.title;
+    const meta = document.createElement("div");
+    meta.className = "bmMeta";
+    meta.textContent =
+      `part ${b.index + 1}${b.total ? " of " + b.total : ""}` +
+      (b.snippet ? " — " + b.snippet : "");
+    info.append(title, meta);
+    const del = document.createElement("button");
+    del.className = "bmDel";
+    del.textContent = "✕";
+    del.title = "Delete bookmark";
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const { bookmarks = [] } = await chrome.storage.local.get("bookmarks");
+      await chrome.storage.local.set({
+        bookmarks: bookmarks.filter((x) => x.id !== b.id),
+      });
+      loadBookmarks();
+    });
+    item.append(info, del);
+    item.addEventListener("click", async () => {
+      statusEl.textContent = "Opening bookmark…";
+      const r = await send("read-bookmark", { id: b.id });
+      if (r && r.ok === false) statusEl.textContent = "⚠ " + r.error;
+    });
+    list.appendChild(item);
+  }
+}
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.target === "status-broadcast") render(msg.status);
@@ -137,4 +139,16 @@ chrome.runtime.onMessage.addListener((msg) => {
   render(await send("status"));
   // Warm up the model in the background so the first Read is fast.
   send("preload");
+  loadBookmarks();
+  // Offer "Resume" if this page has a saved position.
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.url) {
+    const key = "pos:" + tab.url;
+    const pos = (await chrome.storage.local.get(key))[key];
+    if (pos && pos.index > 0) {
+      $("resumeRow").style.display = "";
+      $("resume").textContent =
+        `⏯ Resume part ${pos.index + 1}${pos.total ? " of " + pos.total : ""}`;
+    }
+  }
 })();
