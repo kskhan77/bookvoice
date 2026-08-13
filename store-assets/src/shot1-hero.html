@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  * { margin: 0; box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { width: 1280px; height: 800px; overflow: hidden; background: linear-gradient(135deg, #14161c 0%, #1d2436 60%, #24304e 100%); display: flex; align-items: center; padding: 0 70px; gap: 60px; }
+  .left { flex: 1; color: #fff; }
+  .badge { display: inline-block; background: rgba(79,124,255,.18); color: #8fb0ff; border: 1px solid rgba(79,124,255,.45); padding: 7px 16px; border-radius: 999px; font-size: 17px; font-weight: 600; margin-bottom: 26px; }
+  h1 { font-size: 54px; line-height: 1.12; font-weight: 800; margin-bottom: 22px; }
+  h1 span { color: #6f95ff; }
+  p.sub { font-size: 23px; line-height: 1.5; color: #b8bfd0; max-width: 520px; }
+  ul { list-style: none; margin-top: 32px; }
+  li { font-size: 20px; color: #d7dcea; margin-bottom: 14px; }
+  li::before { content: "✓"; color: #5dd598; font-weight: 800; margin-right: 12px; }
+  .popup { width: 330px; background: #1b1d22; border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+  .popup h2 { font-size: 19px; color: #e8e8ea; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .lbl { font-size: 13px; color: #a5a8b0; min-width: 48px; }
+  .sel { flex: 1; background: #2a2d35; color: #e8e8ea; border: 1px solid #3a3e48; border-radius: 7px; padding: 9px 10px; font-size: 14px; }
+  .slider { flex: 1; height: 6px; background: #2a2d35; border-radius: 3px; position: relative; }
+  .slider .fillbar { position: absolute; left: 0; top: 0; height: 100%; width: 45%; background: #4f7cff; border-radius: 3px; }
+  .slider .knob { position: absolute; left: 45%; top: 50%; transform: translate(-50%,-50%); width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .spd { font-size: 13px; color: #a5a8b0; }
+  .btn { flex: 1; text-align: center; padding: 11px 6px; border-radius: 9px; font-size: 14px; font-weight: 600; color: #e8e8ea; background: #2a2d35; }
+  .btn.primary { background: #4f7cff; color: #fff; }
+  .status { font-size: 13px; color: #a5a8b0; margin-top: 14px; }
+  .bar { height: 5px; background: #2a2d35; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .bar div { height: 100%; width: 38%; background: #4f7cff; }
+</style></head>
+<body>
+  <div class="left">
+    <div class="badge">🔒 100% on-device AI — no cloud</div>
+    <h1>Any ebook, read aloud in a <span>natural human voice</span></h1>
+    <p class="sub">BookVoice turns robotic read-aloud into listening you'll actually enjoy — powered by the Kokoro neural voice model running on your own computer.</p>
+    <ul>
+      <li>Works on articles &amp; library ebook viewers</li>
+      <li>7 lifelike voices, adjustable speed</li>
+      <li>Free forever &nbsp;·&nbsp; works offline</li>
+    </ul>
+  </div>
+  <div class="popup">
+    <h2>📖 BookVoice</h2>
+    <div class="row"><span class="lbl">Voice</span><span class="sel">Heart (US female) — best &nbsp;▾</span></div>
+    <div class="row"><span class="lbl">Speed</span><span class="slider"><span class="fillbar"></span><span class="knob"></span></span><span class="spd">1.2×</span></div>
+    <div class="row"><span class="btn primary">▶ Read page</span></div>
+    <div class="row"><span class="btn">⏸ Pause</span><span class="btn">⏹ Stop</span></div>
+    <div class="status">Reading — part 12 of 42 · GPU</div>
+    <div class="bar"><div></div></div>
+  </div>
+</body></html>

@@ -1,0 +1,16 @@
+{
+  "name": "bookvoice-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that reads web pages and ebooks aloud with Kokoro TTS (local, natural voice)",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "kokoro-js": "^1.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

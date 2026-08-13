@@ -1,0 +1,12 @@
+# Dependencies and local toolchain
+node_modules/
+.tools/
+
+# Build output (regenerate with: npm run build)
+extension/dist/
+
+# Store upload packages
+bookvoice-*.zip
+
+# Local session files
+.claude/

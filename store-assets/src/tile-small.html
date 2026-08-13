@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  * { margin: 0; box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { width: 440px; height: 280px; overflow: hidden; background: linear-gradient(135deg, #1d2436 0%, #24304e 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .icon { width: 86px; height: 86px; border-radius: 20px; background: linear-gradient(135deg, #5b85ff, #3b5fe0); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+  .book { display: flex; gap: 3px; }
+  .pg { width: 26px; height: 32px; background: #fff; }
+  .pg.l { transform: perspective(60px) rotateY(28deg); border-radius: 2px 0 0 2px; }
+  .pg.r { transform: perspective(60px) rotateY(-28deg); border-radius: 0 2px 2px 0; }
+  h1 { color: #fff; font-size: 30px; font-weight: 800; margin-bottom: 6px; }
+  p { color: #b8bfd0; font-size: 16.5px; }
+</style></head>
+<body>
+  <div class="icon"><div class="book"><div class="pg l"></div><div class="pg r"></div></div></div>
+  <h1>BookVoice</h1>
+  <p>Natural AI read-aloud · 100% local</p>
+</body></html>

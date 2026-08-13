@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  * { margin: 0; box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { width: 1280px; height: 800px; overflow: hidden; background: linear-gradient(135deg, #14161c 0%, #1d2436 60%, #24304e 100%); display: flex; flex-direction: column; align-items: center; padding-top: 64px; }
+  h1 { font-size: 44px; font-weight: 800; color: #fff; margin-bottom: 14px; }
+  h1 span { color: #6f95ff; }
+  p.sub { font-size: 22px; color: #b8bfd0; margin-bottom: 44px; }
+  .page { width: 880px; background: #fdfcf8; border-radius: 14px; padding: 56px 72px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .page h2 { font-family: Georgia, serif; font-size: 26px; color: #222; text-align: center; margin-bottom: 30px; font-weight: 600; }
+  .page p { font-family: Georgia, serif; font-size: 21px; line-height: 1.75; color: #2a2a2a; margin-bottom: 20px; }
+  .sent { background: rgba(79,124,255,.22); border-radius: 3px; font-family: Georgia, serif; }
+  .word { background: rgba(255,196,0,.75); border-radius: 3px; font-family: Georgia, serif; }
+  .caption { display: flex; gap: 34px; margin-top: 40px; }
+  .cap { display: flex; align-items: center; gap: 10px; color: #d7dcea; font-size: 18px; }
+  .chip { width: 22px; height: 22px; border-radius: 5px; }
+  .chip.blue { background: rgba(79,124,255,.55); }
+  .chip.yellow { background: rgba(255,196,0,.85); }
+</style></head>
+<body>
+  <h1>Follow along with <span>live highlighting</span></h1>
+  <p class="sub">The sentence being read glows blue — the spoken word sweeps through in yellow. The page scrolls itself.</p>
+  <div class="page">
+    <h2>Chapter One · The Quiet Power of Daily Reading</h2>
+    <p>Every reader begins somewhere, and it is rarely with a grand plan. A few pages before bed, a chapter with morning coffee — these small moments accumulate quietly.</p>
+    <p><span class="sent">What matters is not how quickly you finish a book, but how <span class="word">deeply</span> its ideas settle into your thinking.</span></p>
+    <p>Listening is reading too. When a voice carries the words, your eyes are free to follow, and comprehension often grows rather than shrinks.</p>
+  </div>
+  <div class="caption">
+    <div class="cap"><span class="chip blue"></span> Sentence being read</div>
+    <div class="cap"><span class="chip yellow"></span> Word being spoken</div>
+    <div class="cap">🖱️ Auto-scrolls as it reads</div>
+  </div>
+</body></html>
