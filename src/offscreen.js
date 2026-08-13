@@ -245,7 +245,7 @@ async function warmup() {
     if (ttsDevice === "webgpu" && ms > 45_000) {
       // Real hardware does this in ~10s; minutes means a fake/broken GPU.
       diag("webgpu warmup too slow -> forcing CPU mode");
-      await chrome.storage.local.set({ forceWasm: true });
+      localStorage.setItem("bv_forceWasm", "1");
       resetEngine();
       broadcast({
         state: "loading",
@@ -336,7 +336,10 @@ async function loadModel() {
         });
       }
     };
-    const { forceWasm } = await chrome.storage.local.get("forceWasm");
+    // NOTE: offscreen documents cannot use chrome.storage - only runtime
+    // messaging. Engine-internal flags use localStorage; anything the popup
+    // or background needs goes through background messages.
+    const forceWasm = localStorage.getItem("bv_forceWasm") === "1";
     try {
       if (forceWasm) throw new Error("CPU mode forced (GPU previously too slow)");
       if (!navigator.gpu) throw new Error("WebGPU not available");
@@ -445,8 +448,12 @@ function playNext() {
     s.playingNow = false;
     if (s.doneProducing) {
       broadcast({ state: "done", device: ttsDevice, total: s.chunks.length });
-      // Finished this page: clear the saved position.
-      if (s.url) chrome.storage.local.remove("pos:" + s.url);
+      // Finished this page: clear the saved position (via background).
+      if (s.url) {
+        chrome.runtime
+          .sendMessage({ target: "bg", cmd: "clear-pos", url: s.url })
+          .catch(() => {});
+      }
       session = null;
       relayHighlight("stop");
       releaseKeepAliveSoon();
@@ -468,16 +475,22 @@ function playNext() {
     index: item.index,
   });
   // Persist the reading position so the popup can offer "Resume".
+  // (chrome.storage is unavailable here - the background worker writes it.)
   if (s.url) {
-    chrome.storage.local.set({
-      ["pos:" + s.url]: {
-        index: item.index,
-        total: s.chunks.length,
-        hash: s.hash,
-        title: s.title || "",
-        savedAt: Date.now(),
-      },
-    });
+    chrome.runtime
+      .sendMessage({
+        target: "bg",
+        cmd: "save-pos",
+        url: s.url,
+        value: {
+          index: item.index,
+          total: s.chunks.length,
+          hash: s.hash,
+          title: s.title || "",
+          savedAt: Date.now(),
+        },
+      })
+      .catch(() => {});
   }
   src.onended = () => {
     if (s.stopped) return;
@@ -514,7 +527,7 @@ async function produce(s) {
         // GPU path is effectively broken here; switch to CPU and continue
         // this same reading session from the current chunk.
         diag("webgpu generation too slow -> switching to CPU and restarting");
-        await chrome.storage.local.set({ forceWasm: true });
+        localStorage.setItem("bv_forceWasm", "1");
         const params = {
           text: s.textFull,
           voice: s.voice,

@@ -193,6 +193,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "status":
       sendResponse(lastStatus);
       return; // synchronous
+    case "save-pos":
+      // Written on behalf of the offscreen engine (no chrome.storage there).
+      if (msg.url) {
+        chrome.storage.local.set({ ["pos:" + msg.url]: msg.value });
+      }
+      sendResponse({ ok: true });
+      return;
+    case "clear-pos":
+      if (msg.url) chrome.storage.local.remove("pos:" + msg.url);
+      sendResponse({ ok: true });
+      return;
     case "hl":
       // Highlight event from the TTS engine -> frame being read.
       chrome.storage.session.get("hlTarget").then(({ hlTarget }) => {
