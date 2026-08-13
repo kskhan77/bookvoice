@@ -19,12 +19,53 @@ async function ensureOffscreen() {
   });
 }
 
-// Runs inside the page/frame. Prefers the user's selection, otherwise pulls
-// readable text from the main content area.
+// Runs inside the page/frame. Priority: user selection > Readability article
+// (Firefox Reader Mode extraction - drops ads, nav, "related" boxes) >
+// heuristic fallback. All results pass a junk-line filter.
 function extractText() {
+  function cleanup(raw) {
+    return raw
+      .replace(/\[\d{1,3}\]/g, "") // footnote markers like [12]
+      .split("\n")
+      .map((l) => l.replace(/[ \t]+/g, " ").trim())
+      .filter((l) => l.length > 0)
+      .filter((l) => !/^(advertisement|sponsored( content)?|ad)$/i.test(l))
+      .filter(
+        (l) =>
+          !(
+            l.length < 40 &&
+            /^(share|tweet|print|copy link|download( pdf)?|cite( this)?|related( articles?| content)?|references?|see also|read more|skip to .*|accept( all)? cookies?|cookie settings)$/i.test(
+              l
+            )
+          )
+      )
+      .join("\n")
+      .trim();
+  }
   const sel = window.getSelection && window.getSelection().toString();
   if (sel && sel.trim().length > 20) {
-    return { kind: "selection", text: sel.trim() };
+    return { kind: "selection", text: cleanup(sel) };
+  }
+  // Readability (injected as readability.js before this runs)
+  try {
+    if (window.__bvReadability) {
+      const article = new window.__bvReadability(document.cloneNode(true), {
+        charThreshold: 250,
+      }).parse();
+      if (article && article.textContent) {
+        const body = cleanup(article.textContent);
+        if (body.length > 500) {
+          const title = (article.title || "").trim();
+          return {
+            kind: "article",
+            title,
+            text: title ? title + ".\n" + body : body,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    // fall through to heuristic
   }
   const root =
     document.querySelector('main, article, [role="main"]') || document.body;
@@ -32,13 +73,10 @@ function extractText() {
   const clone = root.cloneNode(true);
   clone
     .querySelectorAll(
-      "script,style,noscript,nav,header,footer,aside,button,form,svg,figure figcaption"
+      "script,style,noscript,nav,header,footer,aside,button,form,svg,figure figcaption,[aria-hidden='true'],[role='complementary'],[class*='cookie'],[id*='cookie']"
     )
     .forEach((e) => e.remove());
-  const text = (clone.innerText || clone.textContent || "")
-    .replace(/[ \t]+/g, " ")
-    .trim();
-  return { kind: "page", text };
+  return { kind: "page", text: cleanup(clone.innerText || clone.textContent || "") };
 }
 
 // Must match the hash used by the offscreen engine when saving positions.
@@ -49,8 +87,21 @@ function textHash(t) {
 // Extract text from a tab and start reading it. `resume` continues from the
 // saved position if the page text still matches; `startIndex` (bookmarks)
 // forces a specific chunk.
-async function readTab(tabId, { voice, speed, resume, startIndex } = {}) {
+async function readTab(
+  tabId,
+  { voice, speed, resume, startIndex, startText } = {}
+) {
   const tab = await chrome.tabs.get(tabId);
+
+  // Give every frame the Readability article extractor first.
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ["readability.js"],
+    });
+  } catch (e) {
+    console.warn("Readability injection failed (using fallback):", e);
+  }
 
   // Ebook viewers render asynchronously; retry extraction a few times.
   let best = null;
@@ -62,8 +113,12 @@ async function readTab(tabId, { voice, speed, resume, startIndex } = {}) {
     const values = results
       .filter((r) => r?.result)
       .map((r) => ({ ...r.result, frameId: r.frameId }));
+    // "Read from here" wants the whole article even if text is selected.
     best =
-      values.find((v) => v.kind === "selection") ||
+      (!startText && values.find((v) => v.kind === "selection")) ||
+      values
+        .filter((v) => v.kind === "article")
+        .sort((a, b) => b.text.length - a.text.length)[0] ||
       values.sort((a, b) => b.text.length - a.text.length)[0];
     if (best && best.text.length >= 40) break;
     await new Promise((r) => setTimeout(r, 1200));
@@ -116,9 +171,43 @@ async function readTab(tabId, { voice, speed, resume, startIndex } = {}) {
     url: tab.url,
     title: tab.title || tab.url,
     resumeIndex,
+    startText,
   });
   return { ok: true, resumeIndex };
 }
+
+// --- "Read from here" context menu ------------------------------------------
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "bv-read-here",
+    title: "BookVoice: Read from here",
+    contexts: ["page", "selection"],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "bv-read-here" || !tab?.id) return;
+  try {
+    let startText = (info.selectionText || "").trim();
+    if (!startText) {
+      // The ctxmenu.js content script stored the right-clicked paragraph.
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: () => {
+          const t = window.__bvCtxText;
+          window.__bvCtxText = null;
+          return t || null;
+        },
+      });
+      startText = results.map((r) => r?.result).find(Boolean) || "";
+    }
+    const { voice, speed } = await chrome.storage.local.get(["voice", "speed"]);
+    await readTab(tab.id, { voice, speed, startText });
+  } catch (e) {
+    console.warn("Read-from-here failed:", e);
+  }
+});
 
 async function addBookmark() {
   const { hlTarget } = await chrome.storage.session.get("hlTarget");

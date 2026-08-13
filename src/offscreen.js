@@ -568,7 +568,15 @@ async function produce(s) {
   s.doneProducing = true;
 }
 
-async function startReading({ text, voice, speed, url, title, resumeIndex }) {
+async function startReading({
+  text,
+  voice,
+  speed,
+  url,
+  title,
+  resumeIndex,
+  startText,
+}) {
   stopSession();
   startKeepAlive();
   await loadModel();
@@ -579,7 +587,27 @@ async function startReading({ text, voice, speed, url, title, resumeIndex }) {
     broadcast({ state: "error", error: "No readable text found on the page." });
     return;
   }
-  const startAt = Math.min(Math.max(0, resumeIndex || 0), chunks.length - 1);
+  // "Read from here": find the chunk containing the right-clicked text.
+  let fromText = null;
+  if (startText && resumeIndex == null) {
+    const strip = (t) => t.toLowerCase().replace(/\s+/g, "");
+    const needle = strip(startText).slice(0, 60);
+    if (needle.length >= 12) {
+      let acc = "";
+      const bounds = chunks.map((c) => {
+        const s = acc.length;
+        acc += strip(c);
+        return { s, e: acc.length };
+      });
+      const hit = acc.indexOf(needle);
+      if (hit >= 0) fromText = bounds.findIndex((b) => hit < b.e);
+      diag(`read-from-here: needle ${hit >= 0 ? "found at chunk " + fromText : "not found"}`);
+    }
+  }
+  const startAt = Math.min(
+    Math.max(0, fromText ?? resumeIndex ?? 0),
+    chunks.length - 1
+  );
   // Shorten the first chunk to be spoken so audio starts sooner.
   const first = chunks[startAt];
   if (first.length > 160) {
@@ -597,7 +625,7 @@ async function startReading({ text, voice, speed, url, title, resumeIndex }) {
     title: title || "",
     hash: textHash(text),
     startAt,
-    snippet: "",
+    snippet: chunks[startAt].slice(0, 90), // preview before audio starts
     queue: [],
     played: startAt,
     playingNow: false,
@@ -633,6 +661,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await ctx.resume();
           relayHighlight("resume");
           report();
+        }
+        return { ok: true };
+      case "skip":
+        // Jump to the next sentence: stopping the source fires onended,
+        // which advances playback naturally.
+        if (session && session.currentSrc && !session.paused) {
+          try {
+            session.currentSrc.stop();
+          } catch {}
         }
         return { ok: true };
       case "stop":

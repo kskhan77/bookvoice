@@ -28,6 +28,7 @@
     <div class="pill" id="pill">
       <span>📖</span>
       <button id="pp" class="play" title="Pause">⏸</button>
+      <button id="sk" title="Skip this sentence">⏭</button>
       <button id="st" title="Stop">⏹</button>
       <span class="prog" id="prog">–/–</span>
       <button id="cl" title="Hide control">✕</button>
@@ -40,6 +41,7 @@
     chrome.runtime.sendMessage({ target: "bg", cmd }).catch(() => {});
 
   el("pp").addEventListener("click", () => send(paused ? "resume" : "pause"));
+  el("sk").addEventListener("click", () => send("skip"));
   el("st").addEventListener("click", () => send("stop"));
   el("cl").addEventListener("click", () => {
     window.__bookvoiceFloat = false;

@@ -18,6 +18,18 @@ await esbuild.build({
   logLevel: "info",
 });
 
+// Readability article extractor, injected into page frames before extraction.
+await esbuild.build({
+  entryPoints: ["src/readability-inject.js"],
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: "chrome124",
+  minify: true,
+  outfile: "extension/readability.js",
+  logLevel: "info",
+});
+
 // onnxruntime-web loads these at runtime; MV3 forbids fetching them from a CDN.
 const ortDist = "node_modules/onnxruntime-web/dist";
 for (const f of readdirSync(ortDist)) {

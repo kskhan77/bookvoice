@@ -44,7 +44,9 @@ function render(st) {
       paused = st.state === "paused";
       pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
       statusEl.textContent = st.preparing
-        ? "Generating audio… starts in a few seconds"
+        ? "Generating audio… will start with: “" +
+          (st.snippet || "…") +
+          "”"
         : (paused ? "Paused" : "Reading") +
           ` — part ${Math.min(st.current + 1, st.total)} of ${st.total}` +
           dev;
