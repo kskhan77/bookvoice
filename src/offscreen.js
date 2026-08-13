@@ -39,6 +39,8 @@ function startKeepAlive() {
 
 function releaseKeepAliveSoon() {
   clearTimeout(idleTimer);
+  // 5 minutes: keeps the model warm between chapters/sections so the next
+  // Read starts instantly, then lets Chrome reclaim the memory.
   idleTimer = setTimeout(() => {
     if (!session && keepAlive) {
       try {
@@ -47,7 +49,7 @@ function releaseKeepAliveSoon() {
       } catch {}
       keepAlive = null; // Chrome may now close this document; that's fine
     }
-  }, 60_000);
+  }, 300_000);
 }
 
 // ---- Resumable model download ----------------------------------------------
@@ -220,6 +222,20 @@ async function ensureModelCached(relPath) {
 let tts = null;
 let ttsDevice = null;
 let loadPromise = null;
+let warmedUp = false;
+
+// First generation after a model load compiles GPU shaders (~10s). Run a tiny
+// generation during idle preload so the user's first Read starts fast — but
+// never block or compete with a real reading session.
+async function warmup() {
+  if (warmedUp || session) return;
+  try {
+    await tts.generate("Hi.", { voice: "af_heart" });
+    warmedUp = true;
+  } catch (e) {
+    console.warn("Warm-up generation failed:", e);
+  }
+}
 let ctx = null;
 let session = null; // current reading session
 
@@ -297,17 +313,6 @@ async function loadModel() {
         progress_callback,
       });
       ttsDevice = "wasm";
-    }
-    // First generation compiles GPU shaders (~10s). Do it now, during
-    // preload, so the user's first "Read page" starts within seconds.
-    broadcast({
-      state: "loading",
-      detail: "Optimizing for your device (one-time warm-up)",
-    });
-    try {
-      await tts.generate("Hi.", { voice: "af_heart" });
-    } catch (e) {
-      console.warn("Warm-up generation failed:", e);
     }
     broadcast({ state: "ready", device: ttsDevice });
     if (!session) releaseKeepAliveSoon();
@@ -530,9 +535,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         stopSession();
         return { ok: true };
       case "preload":
-        loadModel().catch((e) =>
-          broadcast({ state: "error", error: String(e) })
-        );
+        loadModel()
+          .then(() => warmup())
+          .catch((e) => broadcast({ state: "error", error: String(e) }));
         return { ok: true };
       default:
         return { ok: false, error: "unknown command" };
