@@ -43,10 +43,11 @@ function render(st) {
     case "paused":
       paused = st.state === "paused";
       pauseBtn.textContent = paused ? "▶ Resume" : "⏸ Pause";
-      statusEl.textContent =
-        (paused ? "Paused" : "Reading") +
-        ` — part ${Math.min(st.current + 1, st.total)} of ${st.total}` +
-        dev;
+      statusEl.textContent = st.preparing
+        ? "Generating audio… starts in a few seconds"
+        : (paused ? "Paused" : "Reading") +
+          ` — part ${Math.min(st.current + 1, st.total)} of ${st.total}` +
+          dev;
       fillEl.style.width = (st.current / st.total) * 100 + "%";
       break;
     case "done":

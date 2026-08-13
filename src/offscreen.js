@@ -244,6 +244,7 @@ function report(extra = {}) {
     current: session.played,
     total: session.chunks.length,
     snippet: session.snippet || "",
+    preparing: !session.audioStarted,
     ...extra,
   });
 }
@@ -275,10 +276,13 @@ async function loadModel() {
     const hasWebGPU = !!navigator.gpu;
     try {
       if (!hasWebGPU) throw new Error("WebGPU not available");
-      await ensureModelCached("onnx/model.onnx"); // fp32
+      // fp16 is ~4x faster than fp32 on integrated GPUs (and half the
+      // download); on this class of hardware fp32 generates slower than
+      // real-time, which sounds like the extension "not reading".
+      await ensureModelCached("onnx/model_fp16.onnx");
       broadcast({ state: "loading", detail: "Loading model on GPU" });
       tts = await KokoroTTS.from_pretrained(MODEL_ID, {
-        dtype: "fp32",
+        dtype: "fp16",
         device: "webgpu",
         progress_callback,
       });
@@ -293,6 +297,17 @@ async function loadModel() {
         progress_callback,
       });
       ttsDevice = "wasm";
+    }
+    // First generation compiles GPU shaders (~10s). Do it now, during
+    // preload, so the user's first "Read page" starts within seconds.
+    broadcast({
+      state: "loading",
+      detail: "Optimizing for your device (one-time warm-up)",
+    });
+    try {
+      await tts.generate("Hi.", { voice: "af_heart" });
+    } catch (e) {
+      console.warn("Warm-up generation failed:", e);
     }
     broadcast({ state: "ready", device: ttsDevice });
     if (!session) releaseKeepAliveSoon();
@@ -372,6 +387,7 @@ function playNext() {
     return;
   }
   s.playingNow = true;
+  s.audioStarted = true;
   const buf = ctx.createBuffer(1, item.samples.length, item.rate);
   buf.copyToChannel(item.samples, 0);
   const src = ctx.createBufferSource();
@@ -404,6 +420,7 @@ function playNext() {
     playNext();
   };
   src.start();
+  report(); // audio is now audible; clears the "preparing" state in the UI
 }
 
 async function produce(s) {
@@ -420,6 +437,7 @@ async function produce(s) {
         speed: s.speed,
       });
       if (s.stopped) return;
+      s.genErrors = 0;
       s.queue.push({
         samples: audio.audio,
         rate: audio.sampling_rate,
@@ -428,6 +446,16 @@ async function produce(s) {
       if (!s.playingNow) playNext();
     } catch (e) {
       console.error("Generation failed for chunk", i, e);
+      s.genErrors = (s.genErrors || 0) + 1;
+      if (s.genErrors >= 3) {
+        // Persistent failure: stop and tell the user instead of sitting silent.
+        broadcast({
+          state: "error",
+          error: "Voice generation failed: " + (e.message || e),
+        });
+        stopSession();
+        return;
+      }
     }
   }
   s.doneProducing = true;
@@ -445,6 +473,13 @@ async function startReading({ text, voice, speed, url, title, resumeIndex }) {
     return;
   }
   const startAt = Math.min(Math.max(0, resumeIndex || 0), chunks.length - 1);
+  // Shorten the first chunk to be spoken so audio starts sooner.
+  const first = chunks[startAt];
+  if (first.length > 160) {
+    let cut = first.lastIndexOf(" ", 120);
+    if (cut < 60) cut = 120;
+    chunks.splice(startAt, 1, first.slice(0, cut).trim(), first.slice(cut).trim());
+  }
   session = {
     chunks,
     voice: voice || "af_heart",
