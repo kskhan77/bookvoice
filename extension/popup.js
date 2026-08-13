@@ -130,6 +130,15 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.target === "status-broadcast") render(msg.status);
 });
 
+async function refreshDiag() {
+  try {
+    const r = await send("get-diag");
+    if (r?.log) $("diag").textContent = r.log.join("\n") || "(no activity yet)";
+  } catch {}
+}
+setInterval(refreshDiag, 2000);
+refreshDiag();
+
 (async () => {
   const saved = await chrome.storage.local.get(["voice", "speed"]);
   if (saved.voice) $("voice").value = saved.voice;

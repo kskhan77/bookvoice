@@ -227,13 +227,36 @@ let warmedUp = false;
 // First generation after a model load compiles GPU shaders (~10s). Run a tiny
 // generation during idle preload so the user's first Read starts fast — but
 // never block or compete with a real reading session.
+function resetEngine() {
+  tts = null;
+  loadPromise = null;
+  warmedUp = false;
+  ttsDevice = null;
+}
+
 async function warmup() {
   if (warmedUp || session) return;
   try {
+    const t0 = performance.now();
     await tts.generate("Hi.", { voice: "af_heart" });
+    const ms = performance.now() - t0;
+    diag(`warmup gen ${Math.round(ms)}ms`);
     warmedUp = true;
+    if (ttsDevice === "webgpu" && ms > 45_000) {
+      // Real hardware does this in ~10s; minutes means a fake/broken GPU.
+      diag("webgpu warmup too slow -> forcing CPU mode");
+      await chrome.storage.local.set({ forceWasm: true });
+      resetEngine();
+      broadcast({
+        state: "loading",
+        detail: "GPU too slow for live reading — switching to CPU mode",
+      });
+      await loadModel();
+      warmedUp = false;
+      await warmup();
+    }
   } catch (e) {
-    console.warn("Warm-up generation failed:", e);
+    diag("warmup failed: " + (e.message || e));
   }
 }
 let ctx = null;
@@ -243,6 +266,30 @@ function broadcast(status) {
   chrome.runtime
     .sendMessage({ target: "status-broadcast", status })
     .catch(() => {});
+}
+
+// Rolling diagnostics log, viewable from the popup's Diagnostics panel.
+const diagLog = [];
+function diag(m) {
+  const line = new Date().toISOString().slice(11, 19) + " " + m;
+  diagLog.push(line);
+  if (diagLog.length > 60) diagLog.shift();
+  console.log("[bookvoice]", m);
+}
+
+async function gpuAdapterInfo() {
+  try {
+    const a = await navigator.gpu?.requestAdapter();
+    if (!a) return null;
+    const i = a.info || {};
+    return {
+      vendor: i.vendor || "",
+      arch: i.architecture || "",
+      fallback: !!a.isFallbackAdapter,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Highlight events -> background -> content script in the frame being read.
@@ -289,29 +336,44 @@ async function loadModel() {
         });
       }
     };
-    const hasWebGPU = !!navigator.gpu;
+    const { forceWasm } = await chrome.storage.local.get("forceWasm");
     try {
-      if (!hasWebGPU) throw new Error("WebGPU not available");
+      if (forceWasm) throw new Error("CPU mode forced (GPU previously too slow)");
+      if (!navigator.gpu) throw new Error("WebGPU not available");
+      // Offscreen documents sometimes only get a SOFTWARE WebGPU adapter,
+      // which reports as "GPU" but generates ~50x slower than real time.
+      // Detect that and use the multi-threaded CPU path instead.
+      const g = await gpuAdapterInfo();
+      diag("gpu adapter: " + JSON.stringify(g));
+      if (!g || g.fallback || /swiftshader|llvmpipe|software/i.test(g.vendor + " " + g.arch)) {
+        throw new Error("No hardware WebGPU adapter in this context");
+      }
       // fp16 is ~4x faster than fp32 on integrated GPUs (and half the
       // download); on this class of hardware fp32 generates slower than
       // real-time, which sounds like the extension "not reading".
       await ensureModelCached("onnx/model_fp16.onnx");
       broadcast({ state: "loading", detail: "Loading model on GPU" });
+      const t0 = performance.now();
       tts = await KokoroTTS.from_pretrained(MODEL_ID, {
         dtype: "fp16",
         device: "webgpu",
         progress_callback,
       });
+      diag(`model loaded webgpu/fp16 in ${Math.round(performance.now() - t0)}ms`);
       ttsDevice = "webgpu";
     } catch (e) {
-      console.warn("WebGPU load failed, falling back to WASM:", e);
+      diag("webgpu unavailable -> wasm: " + (e.message || e));
       await ensureModelCached("onnx/model_quantized.onnx"); // q8
       broadcast({ state: "loading", detail: "Loading model on CPU" });
+      const t0 = performance.now();
       tts = await KokoroTTS.from_pretrained(MODEL_ID, {
         dtype: "q8",
         device: "wasm",
         progress_callback,
       });
+      diag(
+        `model loaded wasm/q8 in ${Math.round(performance.now() - t0)}ms (isolated=${crossOriginIsolated}, cores=${navigator.hardwareConcurrency})`
+      );
       ttsDevice = "wasm";
     }
     broadcast({ state: "ready", device: ttsDevice });
@@ -425,6 +487,7 @@ function playNext() {
     playNext();
   };
   src.start();
+  diag(`play#${item.index} started (${buf.duration.toFixed(1)}s)`);
   report(); // audio is now audible; clears the "preparing" state in the UI
 }
 
@@ -437,11 +500,37 @@ async function produce(s) {
     }
     if (s.stopped) return;
     try {
+      const t0 = performance.now();
       const audio = await tts.generate(s.chunks[i], {
         voice: s.voice,
         speed: s.speed,
       });
+      const genMs = performance.now() - t0;
+      diag(
+        `gen#${i} ${Math.round(genMs)}ms for ${(audio.audio.length / audio.sampling_rate).toFixed(1)}s audio [${ttsDevice}]`
+      );
       if (s.stopped) return;
+      if (ttsDevice === "webgpu" && genMs > 45_000) {
+        // GPU path is effectively broken here; switch to CPU and continue
+        // this same reading session from the current chunk.
+        diag("webgpu generation too slow -> switching to CPU and restarting");
+        await chrome.storage.local.set({ forceWasm: true });
+        const params = {
+          text: s.textFull,
+          voice: s.voice,
+          speed: s.speed,
+          url: s.url,
+          title: s.title,
+          resumeIndex: i,
+        };
+        resetEngine();
+        broadcast({
+          state: "loading",
+          detail: "GPU too slow for live reading — switching to CPU mode",
+        });
+        startReading(params);
+        return;
+      }
       s.genErrors = 0;
       s.queue.push({
         samples: audio.audio,
@@ -485,8 +574,10 @@ async function startReading({ text, voice, speed, url, title, resumeIndex }) {
     if (cut < 60) cut = 120;
     chunks.splice(startAt, 1, first.slice(0, cut).trim(), first.slice(cut).trim());
   }
+  diag(`session start: ${chunks.length} chunks, from #${startAt}`);
   session = {
     chunks,
+    textFull: text,
     voice: voice || "af_heart",
     speed: Number(speed) || 1,
     url: url || null,
@@ -539,6 +630,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           .then(() => warmup())
           .catch((e) => broadcast({ state: "error", error: String(e) }));
         return { ok: true };
+      case "get-diag":
+        return { ok: true, log: diagLog };
       default:
         return { ok: false, error: "unknown command" };
     }
