@@ -414,26 +414,57 @@ function normName(n) {
   return n.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+// Section headings masquerade as speaker labels ("The First Secret: ...");
+// real speaker labels repeat and don't start with heading words.
+const HEADING_WORDS =
+  /^(the|a|an|chapter|part|section|page|step|note|figure|table|introduction|conclusion|summary|contents|index|appendix|preface|foreword|lesson|unit|book|volume|one|two|three|four|five)\b/i;
+const PRONOUNS = new Set([
+  "he",
+  "she",
+  "they",
+  "i",
+  "we",
+  "you",
+  "it",
+  "him",
+  "her",
+  "them",
+  "who",
+  "someone",
+  "everyone",
+]);
+
 function detectSegments(text) {
   const lines = text.split("\n");
-  // Layer 1: explicitly labeled lines (INTERVIEWER:, Alice:, Q:, A:)
+  // Layer 1: explicitly labeled lines (INTERVIEWER:, Alice:, Q:, A:).
+  // A label only counts as a speaker if it appears at least twice.
   const labelRe = /^([A-Z][A-Za-z .'’-]{0,24}?)\s*:\s+(.+)$/;
-  const labels = new Set();
-  let labeledCount = 0;
+  const labelCounts = new Map();
   for (const ln of lines) {
     const m = ln.match(labelRe);
     if (m) {
-      labeledCount++;
-      labels.add(normName(m[1]));
+      const name = normName(m[1]);
+      if (!HEADING_WORDS.test(name) && name.split(" ").length <= 3) {
+        labelCounts.set(name, (labelCounts.get(name) || 0) + 1);
+      }
     }
   }
-  if (labeledCount >= 3 && labels.size >= 2 && labels.size <= 12) {
+  const usable = new Set(
+    [...labelCounts].filter(([, n]) => n >= 2).map(([name]) => name)
+  );
+  const usableLines = [...labelCounts]
+    .filter(([name]) => usable.has(name))
+    .reduce((a, [, n]) => a + n, 0);
+  if (usable.size >= 2 && usable.size <= 12 && usableLines >= 4) {
     const segs = [];
     for (const ln of lines) {
       if (!ln.trim()) continue;
       const m = ln.match(labelRe);
-      if (m) segs.push({ speaker: normName(m[1]), text: m[2] });
-      else segs.push({ speaker: null, text: ln });
+      if (m && usable.has(normName(m[1]))) {
+        segs.push({ speaker: normName(m[1]), text: m[2] });
+      } else {
+        segs.push({ speaker: null, text: ln });
+      }
     }
     return segs;
   }
@@ -442,12 +473,15 @@ function detectSegments(text) {
   // the regex accepts straight and curly quotes.)
   const segs = [];
   const qRe = /["“]([^"”\n]{2,400})["”]/g;
+  // Attribution accepts proper names ("said Alice") AND lowercase
+  // descriptors ("said the young man", "the manager replied").
   const attrAfter = new RegExp(
-    `^[\\s,.;—-]{0,4}(?:(?:${ATTR_VERBS})\\s+([A-Z][a-z]+)|([A-Z][a-z]+)\\s+(?:${ATTR_VERBS}))`
+    `^[\\s,.;—-]{0,6}(?:(?:${ATTR_VERBS})\\s+(?:the\\s+|his\\s+|her\\s+|their\\s+)?([A-Za-z][a-z]+(?:\\s+[a-z]+)?)|(?:the\\s+)?([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)?)\\s+(?:${ATTR_VERBS}))`
   );
   const attrBefore = new RegExp(
-    `([A-Z][a-z]+)\\s+(?:${ATTR_VERBS})[^"“”]{0,20}$`
+    `(?:^|[\\s(])(?:the\\s+|his\\s+|her\\s+|their\\s+)?([A-Za-z][a-z]+(?:\\s+[a-z]+)?)\\s+(?:${ATTR_VERBS})[^"“”]{0,20}$`
   );
+  const validSpeaker = (name) => name && !PRONOUNS.has(name.split(" ")[0]);
   let last = 0;
   let lastQuoteEnd = -1;
   let lastQuoteSpeaker = null;
@@ -464,10 +498,16 @@ function detectSegments(text) {
     let speaker = null;
     const after = text.slice(qRe.lastIndex, qRe.lastIndex + 80);
     const am = after.match(attrAfter);
-    if (am) speaker = normName(am[1] || am[2]);
+    if (am) {
+      const cand = normName(am[1] || am[2]);
+      if (validSpeaker(cand)) speaker = cand;
+    }
     if (!speaker) {
       const bm = before.match(attrBefore);
-      if (bm) speaker = normName(bm[1]);
+      if (bm) {
+        const cand = normName(bm[1]);
+        if (validSpeaker(cand)) speaker = cand;
+      }
     }
     if (!speaker) {
       const others = recent.filter((s) => s !== lastQuoteSpeaker);
