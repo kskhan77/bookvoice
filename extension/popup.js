@@ -71,6 +71,9 @@ async function startReading(extra = {}) {
 $("speed").addEventListener("input", (e) => {
   $("speedVal").textContent = Number(e.target.value).toFixed(1) + "×";
 });
+$("zoomChk").addEventListener("change", (e) => {
+  chrome.storage.local.set({ zoomSent: e.target.checked });
+});
 $("read").addEventListener("click", () => startReading());
 $("resume").addEventListener("click", () => startReading({ resume: true }));
 pauseBtn.addEventListener("click", () => send(paused ? "resume" : "pause"));
@@ -142,12 +145,13 @@ setInterval(refreshDiag, 2000);
 refreshDiag();
 
 (async () => {
-  const saved = await chrome.storage.local.get(["voice", "speed"]);
+  const saved = await chrome.storage.local.get(["voice", "speed", "zoomSent"]);
   if (saved.voice) $("voice").value = saved.voice;
   if (saved.speed) {
     $("speed").value = saved.speed;
     $("speedVal").textContent = Number(saved.speed).toFixed(1) + "×";
   }
+  if (saved.zoomSent === false) $("zoomChk").checked = false;
   render(await send("status"));
   // Warm up the model in the background so the first Read is fast.
   send("preload");
