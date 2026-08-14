@@ -468,6 +468,57 @@ function detectSegments(text) {
     }
     return segs;
   }
+  // Layer 1b: screenplay format - NAME alone on a line, dialogue beneath:
+  //   MARK
+  //   (leaning against the doorframe)
+  //   You've been staring at that same line for three hours.
+  const nameLineRe = /^([A-Z][A-Z .'’-]{1,24})$/;
+  const nameCounts = new Map();
+  for (const ln of lines) {
+    const t = ln.trim();
+    if (nameLineRe.test(t)) {
+      const name = normName(t);
+      if (!HEADING_WORDS.test(name) && name.split(" ").length <= 3) {
+        nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+      }
+    }
+  }
+  const screenCast = new Set(
+    [...nameCounts].filter(([, n]) => n >= 2).map(([name]) => name)
+  );
+  const screenLines = [...nameCounts]
+    .filter(([name]) => screenCast.has(name))
+    .reduce((a, [, n]) => a + n, 0);
+  if (screenCast.size >= 2 && screenCast.size <= 12 && screenLines >= 4) {
+    const segs = [];
+    let current = null;
+    let linesSince = 0;
+    for (const ln of lines) {
+      const t = ln.trim();
+      if (!t) continue;
+      if (nameLineRe.test(t) && screenCast.has(normName(t))) {
+        current = normName(t); // the name line itself is not spoken
+        linesSince = 0;
+        continue;
+      }
+      // Stage directions and scene headings belong to the narrator and
+      // don't end the character's speech block.
+      if (
+        /^[\[(].*[\])]$/.test(t) ||
+        /^(INT\.|EXT\.|TITLE:|CHARACTERS:|SCENE\b|\[)/i.test(t)
+      ) {
+        segs.push({ speaker: null, text: t });
+        continue;
+      }
+      if (current && linesSince < 8) {
+        segs.push({ speaker: current, text: t });
+        linesSince++;
+      } else {
+        segs.push({ speaker: null, text: t });
+      }
+    }
+    return segs;
+  }
   // Layer 2 + 3: quoted dialogue with attribution, alternation fallback.
   // (Text is left byte-identical to the page so highlighting keeps working;
   // the regex accepts straight and curly quotes.)
