@@ -819,7 +819,8 @@ async function startReading({
   let fromText = null;
   if (startText && resumeIndex == null) {
     const strip = (t) => t.toLowerCase().replace(/\s+/g, "");
-    const needle = strip(startText).slice(0, 60);
+    // Footnote markers are cleaned out of the chunks, so clean the anchor too.
+    const needle = strip(startText.replace(/\[\d{1,3}\]/g, "")).slice(0, 60);
     if (needle.length >= 12) {
       let acc = "";
       const bounds = chunks.map((c) => {

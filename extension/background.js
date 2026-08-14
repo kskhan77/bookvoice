@@ -222,8 +222,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   try {
     let startText = (info.selectionText || "").trim();
-    if (!startText) {
-      // The ctxmenu.js content script stored the right-clicked paragraph.
+    // A short selection (a word or two) can't locate a position in a long
+    // text - use the right-clicked paragraph as the anchor instead.
+    if (startText.length < 20) {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
         func: () => {
@@ -232,7 +233,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           return t || null;
         },
       });
-      startText = results.map((r) => r?.result).find(Boolean) || "";
+      const ctxText = results.map((r) => r?.result).find(Boolean) || "";
+      if (ctxText.length > startText.length) startText = ctxText;
     }
     const { voice, speed } = await chrome.storage.local.get(["voice", "speed"]);
     await readTab(tab.id, { voice, speed, startText });
