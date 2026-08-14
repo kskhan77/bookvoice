@@ -34,8 +34,23 @@
   let wordPlan = null;
   let zoomSpans = [];
 
-  const isWs = (c) =>
-    c === " " || c === "\t" || c === "\n" || c === "\r" || c === " ";
+  // Skip whitespace AND double-quote marks when indexing: multi-voice
+  // dialogue chunks drop the surrounding quote marks, so they must not
+  // break contiguity between chunk text and page text.
+  const SKIP_CHARS = new Set([
+    " ",
+    "\t",
+    "\n",
+    "\r",
+    "\u00a0",
+    '"',
+    "\u201c",
+    "\u201d",
+    "\u201e",
+    "\u00ab",
+    "\u00bb",
+  ]);
+  const isWs = (c) => SKIP_CHARS.has(c);
 
   function clearTimers() {
     timers.forEach(clearTimeout);
@@ -93,8 +108,11 @@
     const re = /\S+/g;
     let m;
     while ((m = re.exec(text))) {
+      // Apply the same skip rules as the page index (quote marks dropped).
+      const filtered = [...m[0]].filter((c) => !isWs(c)).join("");
+      if (!filtered) continue;
       const s = needle.length;
-      needle += m[0].toLowerCase();
+      needle += filtered.toLowerCase();
       words.push({ s, e: needle.length, raw: m[0] });
     }
     return { needle, words };
