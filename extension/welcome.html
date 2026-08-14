@@ -71,14 +71,19 @@
         white-space: pre-line;
       }
       .foot { margin-top: 28px; font-size: 13px; color: #8a8f9c; line-height: 1.6; }
+      .titleRow {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
       .author {
-        margin-top: 26px;
-        text-align: center;
+        margin-left: auto;
         font-family: Georgia, "Times New Roman", serif;
         font-style: italic;
-        font-size: 15px;
-        letter-spacing: 0.8px;
-        color: #d4af37;
+        font-size: 14px;
+        letter-spacing: 0.6px;
+        text-decoration: none;
+        white-space: nowrap;
       }
       .author span {
         background: linear-gradient(
@@ -102,7 +107,16 @@
   </head>
   <body>
     <div class="card">
-      <h1>📖 BookVoice device check</h1>
+      <div class="titleRow">
+        <h1>📖 BookVoice device check</h1>
+        <a
+          class="author"
+          href="https://github.com/kskhan77"
+          target="_blank"
+          title="GitHub — Khurram Shafique"
+          >✦ <span>Khurram Shafique</span> ✦</a
+        >
+      </div>
       <div class="sub">
         BookVoice runs its AI voice entirely on your computer. Here's how well
         this device can handle it.
@@ -127,7 +141,6 @@
         audio. All reading today stays 100% on your device: nothing you read
         is ever uploaded.
       </div>
-      <div class="author">✦ <span>Crafted by Khurram Shafique</span> ✦</div>
     </div>
     <script src="welcome.js"></script>
   </body>
