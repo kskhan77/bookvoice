@@ -11,3 +11,7 @@ bookvoice-*.zip
 
 # Local session files
 .claude/
+
+# Repro fixtures and bundles
+test/pp.html
+test/repro.bundle.js

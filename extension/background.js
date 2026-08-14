@@ -26,6 +26,7 @@ function extractText(ignoreSelection) {
   function cleanup(raw) {
     return raw
       .replace(/\[\d{1,3}\]/g, "") // footnote markers like [12]
+      .replace(/\{\d{1,4}\}/g, "") // page markers like {1} (Gutenberg)
       .split("\n")
       .map((l) => l.replace(/[ \t]+/g, " ").trim())
       .filter((l) => l.length > 0)
