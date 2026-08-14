@@ -22,7 +22,7 @@ async function ensureOffscreen() {
 // Runs inside the page/frame. Priority: user selection > Readability article
 // (Firefox Reader Mode extraction - drops ads, nav, "related" boxes) >
 // heuristic fallback. All results pass a junk-line filter.
-function extractText() {
+function extractText(ignoreSelection) {
   function cleanup(raw) {
     return raw
       .replace(/\[\d{1,3}\]/g, "") // footnote markers like [12]
@@ -42,7 +42,8 @@ function extractText() {
       .join("\n")
       .trim();
   }
-  const sel = window.getSelection && window.getSelection().toString();
+  const sel =
+    !ignoreSelection && window.getSelection && window.getSelection().toString();
   if (sel && sel.trim().length > 20) {
     return { kind: "selection", text: cleanup(sel) };
   }
@@ -123,11 +124,13 @@ async function readTab(
     const results = await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
       func: extractText,
+      // "Read from here" wants the whole article even if text is selected -
+      // the selection only marks the starting point.
+      args: [Boolean(startText)],
     });
     const values = results
       .filter((r) => r?.result)
       .map((r) => ({ ...r.result, frameId: r.frameId }));
-    // "Read from here" wants the whole article even if text is selected.
     best =
       (!startText && values.find((v) => v.kind === "selection")) ||
       values
