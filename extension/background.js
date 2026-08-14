@@ -52,8 +52,22 @@ function extractText() {
       const article = new window.__bvReadability(document.cloneNode(true), {
         charThreshold: 250,
       }).parse();
-      if (article && article.textContent) {
-        const body = cleanup(article.textContent);
+      if (article && (article.content || article.textContent)) {
+        // article.textContent loses line structure on SPA pages (chat UIs,
+        // scripts), which dialogue detection depends on. Render the article
+        // HTML off-screen and take innerText, which restores line breaks.
+        let raw = article.textContent || "";
+        if (article.content) {
+          const div = document.createElement("div");
+          div.innerHTML = article.content;
+          div.style.cssText =
+            "position:absolute;left:-99999px;top:0;width:800px;";
+          document.body.appendChild(div);
+          const it = div.innerText;
+          div.remove();
+          if (it && it.trim().length >= raw.trim().length * 0.8) raw = it;
+        }
+        const body = cleanup(raw);
         if (body.length > 500) {
           const title = (article.title || "").trim();
           return {
