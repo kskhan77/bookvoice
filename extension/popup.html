@@ -89,6 +89,35 @@
         background: #4f7cff;
         transition: width 0.3s;
       }
+      .author {
+        text-align: center;
+        margin-top: 10px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-style: italic;
+        font-size: 12.5px;
+        letter-spacing: 0.6px;
+        color: #d4af37;
+      }
+      .author span {
+        background: linear-gradient(
+          100deg,
+          #8a6d1d 0%,
+          #d4af37 25%,
+          #fff3b0 50%,
+          #d4af37 75%,
+          #8a6d1d 100%
+        );
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shimmer 6s linear infinite;
+      }
+      @keyframes shimmer {
+        to {
+          background-position: 200% center;
+        }
+      }
       #resume {
         background: #2f6d4f;
         color: #fff;
@@ -228,7 +257,8 @@
       <h2>Bookmarks</h2>
       <div id="bmList"></div>
     </div>
-    <div style="margin-top: 12px; text-align: center">
+    <div class="author">✦ <span>Crafted by Khurram Shafique</span> ✦</div>
+    <div style="margin-top: 8px; text-align: center">
       <a
         id="devCheck"
         href="#"
