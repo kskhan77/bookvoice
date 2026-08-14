@@ -101,11 +101,19 @@ document.addEventListener(
   "contextmenu",
   (e) => {
     let el = e.target;
-    let text = "";
-    while (el && (text = (el.innerText || "").trim()).length < 60) {
+    while (el && el !== document.body) {
+      const t = (el.innerText || "").trim();
+      if (t.length >= 25) break;
       el = el.parentElement;
     }
-    lastCtxText = text.slice(0, 200);
+    let text = el && el !== document.body ? (el.innerText || "").trim() : "";
+    if (text.length > 400) text = ""; // clicked a container, not a paragraph
+    let sib = el;
+    while (text && text.length < 80 && sib) {
+      sib = sib.nextElementSibling;
+      if (sib) text += " " + (sib.innerText || "").trim();
+    }
+    lastCtxText = text.replace(/\s+/g, " ").trim().slice(0, 240);
   },
   true
 );

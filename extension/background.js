@@ -198,12 +198,25 @@ async function readTab(
 
 // --- "Read from here" context menu ------------------------------------------
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "bv-read-here",
-    title: "BookVoice: Read from here",
-    contexts: ["page", "selection"],
+chrome.runtime.onInstalled.addListener(async () => {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "bv-read-here",
+      title: "BookVoice: Read from here",
+      contexts: ["page", "selection"],
+    });
   });
+  // Tabs opened before this install/update don't have the right-click helper
+  // yet; inject it so read-from-here works without a page refresh.
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const t of tabs) {
+    chrome.scripting
+      .executeScript({
+        target: { tabId: t.id, allFrames: true },
+        files: ["ctxmenu.js"],
+      })
+      .catch(() => {});
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -228,8 +241,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
         func: () => {
-          const t = window.__bvCtxText;
-          window.__bvCtxText = null;
+          const t = document.documentElement.dataset.bvCtx;
+          delete document.documentElement.dataset.bvCtx;
           return t || null;
         },
       });
