@@ -19,12 +19,55 @@ function prefs() {
   return { voice, speed };
 }
 
+// Cast panel: detected speakers with per-character voice pickers.
+let lastCastKey = "";
+function renderCast(speakers) {
+  const key = JSON.stringify(speakers || []);
+  if (key === lastCastKey) return; // don't rebuild while a dropdown is open
+  lastCastKey = key;
+  const section = $("castSection");
+  const list = $("castList");
+  list.textContent = "";
+  if (!speakers || speakers.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+  const voiceOptions = [...$("voice").options].map((o) => ({
+    value: o.value,
+    label: o.textContent,
+  }));
+  for (const sp of speakers) {
+    const row = document.createElement("div");
+    row.className = "castRow";
+    const name = document.createElement("div");
+    name.className = "castName";
+    name.textContent = sp.name;
+    const sel = document.createElement("select");
+    for (const v of voiceOptions) {
+      const o = document.createElement("option");
+      o.value = v.value;
+      o.textContent = v.label;
+      sel.appendChild(o);
+    }
+    sel.value = sp.voice;
+    sel.addEventListener("change", async () => {
+      const { castVoices = {} } = await chrome.storage.local.get("castVoices");
+      castVoices[sp.name] = sel.value;
+      chrome.storage.local.set({ castVoices });
+    });
+    row.append(name, sel);
+    list.appendChild(row);
+  }
+}
+
 function render(st) {
   if (!st) return;
   const dev =
     st.device === "webgpu" ? " · GPU" : st.device === "wasm" ? " · CPU" : "";
   const reading = st.state === "playing" || st.state === "paused";
   $("bmRow").style.display = reading ? "" : "none";
+  if (reading) renderCast(st.speakers);
   switch (st.state) {
     case "idle":
       statusEl.textContent = "Ready. Select text or just hit Read page." + dev;
@@ -73,6 +116,9 @@ $("speed").addEventListener("input", (e) => {
 });
 $("zoomChk").addEventListener("change", (e) => {
   chrome.storage.local.set({ zoomSent: e.target.checked });
+});
+$("mvChk").addEventListener("change", (e) => {
+  chrome.storage.local.set({ multiVoice: e.target.checked });
 });
 $("read").addEventListener("click", () => startReading());
 $("resume").addEventListener("click", () => startReading({ resume: true }));
@@ -145,13 +191,19 @@ setInterval(refreshDiag, 2000);
 refreshDiag();
 
 (async () => {
-  const saved = await chrome.storage.local.get(["voice", "speed", "zoomSent"]);
+  const saved = await chrome.storage.local.get([
+    "voice",
+    "speed",
+    "zoomSent",
+    "multiVoice",
+  ]);
   if (saved.voice) $("voice").value = saved.voice;
   if (saved.speed) {
     $("speed").value = saved.speed;
     $("speedVal").textContent = Number(saved.speed).toFixed(1) + "×";
   }
   if (saved.zoomSent === false) $("zoomChk").checked = false;
+  if (saved.multiVoice === false) $("mvChk").checked = false;
   render(await send("status"));
   // Warm up the model in the background so the first Read is fast.
   send("preload");

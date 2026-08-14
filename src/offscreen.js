@@ -308,6 +308,7 @@ function report(extra = {}) {
     total: session.chunks.length,
     snippet: session.snippet || "",
     preparing: !session.audioStarted,
+    speakers: session.speakers || [],
     ...extra,
   });
 }
@@ -391,6 +392,134 @@ async function loadModel() {
   }
 }
 
+// ---- Multi-voice dialogue detection ----------------------------------------
+// Splits text into (speaker, text) segments so dialogue can be voiced by a
+// cast. Three layers: explicit "Name:" labels (interviews, plays), attributed
+// quotes ("...," said Alice), and alternation between recent speakers for
+// unattributed quotes in a conversation.
+
+const VOICE_POOL = [
+  "af_heart",
+  "af_bella",
+  "af_nicole",
+  "am_michael",
+  "am_fenrir",
+  "bf_emma",
+  "bm_george",
+];
+const ATTR_VERBS =
+  "said|asked|replied|answered|shouted|whispered|muttered|added|continued|cried|exclaimed|responded|snapped|murmured|called|agreed|admitted|began";
+
+function normName(n) {
+  return n.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function detectSegments(text) {
+  const lines = text.split("\n");
+  // Layer 1: explicitly labeled lines (INTERVIEWER:, Alice:, Q:, A:)
+  const labelRe = /^([A-Z][A-Za-z .'’-]{0,24}?)\s*:\s+(.+)$/;
+  const labels = new Set();
+  let labeledCount = 0;
+  for (const ln of lines) {
+    const m = ln.match(labelRe);
+    if (m) {
+      labeledCount++;
+      labels.add(normName(m[1]));
+    }
+  }
+  if (labeledCount >= 3 && labels.size >= 2 && labels.size <= 12) {
+    const segs = [];
+    for (const ln of lines) {
+      if (!ln.trim()) continue;
+      const m = ln.match(labelRe);
+      if (m) segs.push({ speaker: normName(m[1]), text: m[2] });
+      else segs.push({ speaker: null, text: ln });
+    }
+    return segs;
+  }
+  // Layer 2 + 3: quoted dialogue with attribution, alternation fallback.
+  // (Text is left byte-identical to the page so highlighting keeps working;
+  // the regex accepts straight and curly quotes.)
+  const segs = [];
+  const qRe = /["“]([^"”\n]{2,400})["”]/g;
+  const attrAfter = new RegExp(
+    `^[\\s,.;—-]{0,4}(?:(?:${ATTR_VERBS})\\s+([A-Z][a-z]+)|([A-Z][a-z]+)\\s+(?:${ATTR_VERBS}))`
+  );
+  const attrBefore = new RegExp(
+    `([A-Z][a-z]+)\\s+(?:${ATTR_VERBS})[^"“”]{0,20}$`
+  );
+  let last = 0;
+  let lastQuoteEnd = -1;
+  let lastQuoteSpeaker = null;
+  const recent = [];
+  let m;
+  while ((m = qRe.exec(text))) {
+    const before = text.slice(last, m.index);
+    if (before.trim()) segs.push({ speaker: null, text: before });
+    // Long narration since the previous quote ends the conversation scene.
+    if (lastQuoteEnd >= 0 && m.index - lastQuoteEnd > 400) {
+      recent.length = 0;
+      lastQuoteSpeaker = null;
+    }
+    let speaker = null;
+    const after = text.slice(qRe.lastIndex, qRe.lastIndex + 80);
+    const am = after.match(attrAfter);
+    if (am) speaker = normName(am[1] || am[2]);
+    if (!speaker) {
+      const bm = before.match(attrBefore);
+      if (bm) speaker = normName(bm[1]);
+    }
+    if (!speaker) {
+      const others = recent.filter((s) => s !== lastQuoteSpeaker);
+      speaker = others.length
+        ? others[others.length - 1]
+        : lastQuoteSpeaker
+          ? "second speaker"
+          : "speaker";
+    }
+    if (!recent.includes(speaker)) recent.push(speaker);
+    if (recent.length > 4) recent.shift();
+    lastQuoteSpeaker = speaker;
+    segs.push({ speaker, text: m[1] });
+    last = qRe.lastIndex;
+    lastQuoteEnd = qRe.lastIndex;
+  }
+  const tail = text.slice(last);
+  if (tail.trim()) segs.push({ speaker: null, text: tail });
+  return segs;
+}
+
+function voiceFor(speaker, narrator, cast) {
+  if (!speaker) return narrator;
+  if (cast && cast[speaker]) return cast[speaker];
+  const pool = VOICE_POOL.filter((v) => v !== narrator);
+  let h = 0;
+  for (let i = 0; i < speaker.length; i++) {
+    h = (h * 31 + speaker.charCodeAt(i)) >>> 0;
+  }
+  return pool[h % pool.length];
+}
+
+function buildChunks(text, { multiVoice, narrator, cast }) {
+  const segs = multiVoice ? detectSegments(text) : [{ speaker: null, text }];
+  const chunks = [];
+  for (const seg of segs) {
+    const v = voiceFor(seg.speaker, narrator, cast);
+    for (const t of splitIntoChunks(seg.text)) {
+      chunks.push({ t, v, speaker: seg.speaker });
+    }
+  }
+  return chunks;
+}
+
+function castSummary(chunks) {
+  const seen = new Map();
+  for (const c of chunks) {
+    if (c.speaker && !seen.has(c.speaker)) seen.set(c.speaker, c.v);
+  }
+  return [...seen].slice(0, 8).map(([name, voice]) => ({ name, voice }));
+}
+
 // Split text into sentence-boundary chunks small enough for Kokoro's context.
 function splitIntoChunks(text, maxLen = 300) {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -468,9 +597,9 @@ function playNext() {
   src.buffer = buf;
   src.connect(ctx.destination);
   s.currentSrc = src;
-  s.snippet = s.chunks[item.index].slice(0, 90);
+  s.snippet = s.chunks[item.index].t.slice(0, 90);
   relayHighlight("chunk", {
-    text: s.chunks[item.index],
+    text: s.chunks[item.index].t,
     duration: buf.duration,
     index: item.index,
   });
@@ -514,13 +643,13 @@ async function produce(s) {
     if (s.stopped) return;
     try {
       const t0 = performance.now();
-      const audio = await tts.generate(s.chunks[i], {
-        voice: s.voice,
+      const audio = await tts.generate(s.chunks[i].t, {
+        voice: s.chunks[i].v || s.voice,
         speed: s.speed,
       });
       const genMs = performance.now() - t0;
       diag(
-        `gen#${i} ${Math.round(genMs)}ms for ${(audio.audio.length / audio.sampling_rate).toFixed(1)}s audio [${ttsDevice}]`
+        `gen#${i} ${Math.round(genMs)}ms for ${(audio.audio.length / audio.sampling_rate).toFixed(1)}s audio [${ttsDevice}${s.chunks[i].speaker ? " · " + s.chunks[i].speaker : ""}]`
       );
       if (s.stopped) return;
       if (ttsDevice === "webgpu" && genMs > 45_000) {
@@ -535,6 +664,8 @@ async function produce(s) {
           url: s.url,
           title: s.title,
           resumeIndex: i,
+          multiVoice: s.multiVoice,
+          cast: s.cast,
         };
         resetEngine();
         broadcast({
@@ -576,13 +707,19 @@ async function startReading({
   title,
   resumeIndex,
   startText,
+  multiVoice,
+  cast,
 }) {
   stopSession();
   startKeepAlive();
   await loadModel();
   if (!ctx) ctx = new AudioContext({ sampleRate: 24000 });
   if (ctx.state === "suspended") await ctx.resume();
-  const chunks = splitIntoChunks(text);
+  const chunks = buildChunks(text, {
+    multiVoice: multiVoice !== false,
+    narrator: voice || "af_heart",
+    cast: cast || {},
+  });
   if (chunks.length === 0) {
     broadcast({ state: "error", error: "No readable text found on the page." });
     return;
@@ -596,7 +733,7 @@ async function startReading({
       let acc = "";
       const bounds = chunks.map((c) => {
         const s = acc.length;
-        acc += strip(c);
+        acc += strip(c.t);
         return { s, e: acc.length };
       });
       const hit = acc.indexOf(needle);
@@ -610,22 +747,33 @@ async function startReading({
   );
   // Shorten the first chunk to be spoken so audio starts sooner.
   const first = chunks[startAt];
-  if (first.length > 160) {
-    let cut = first.lastIndexOf(" ", 120);
+  if (first.t.length > 160) {
+    let cut = first.t.lastIndexOf(" ", 120);
     if (cut < 60) cut = 120;
-    chunks.splice(startAt, 1, first.slice(0, cut).trim(), first.slice(cut).trim());
+    chunks.splice(
+      startAt,
+      1,
+      { ...first, t: first.t.slice(0, cut).trim() },
+      { ...first, t: first.t.slice(cut).trim() }
+    );
   }
-  diag(`session start: ${chunks.length} chunks, from #${startAt}`);
+  const speakers = castSummary(chunks);
+  diag(
+    `session start: ${chunks.length} chunks, from #${startAt}, cast: ${speakers.map((s) => s.name).join(", ") || "none"}`
+  );
   session = {
     chunks,
     textFull: text,
     voice: voice || "af_heart",
     speed: Number(speed) || 1,
+    multiVoice: multiVoice !== false,
+    cast: cast || {},
+    speakers,
     url: url || null,
     title: title || "",
     hash: textHash(text),
     startAt,
-    snippet: chunks[startAt].slice(0, 90), // preview before audio starts
+    snippet: chunks[startAt].t.slice(0, 90), // preview before audio starts
     queue: [],
     played: startAt,
     playingNow: false,

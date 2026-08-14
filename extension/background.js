@@ -161,6 +161,10 @@ async function readTab(
   await chrome.storage.session.set({
     hlTarget: { tabId, frameId: best.frameId },
   });
+  const { multiVoice, castVoices } = await chrome.storage.local.get([
+    "multiVoice",
+    "castVoices",
+  ]);
   await ensureOffscreen();
   await chrome.runtime.sendMessage({
     target: "offscreen",
@@ -172,6 +176,8 @@ async function readTab(
     title: tab.title || tab.url,
     resumeIndex,
     startText,
+    multiVoice: multiVoice !== false,
+    cast: castVoices || {},
   });
   return { ok: true, resumeIndex };
 }
@@ -346,6 +352,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             hlTarget: { tabId, frameId: 0 },
           });
         }
+        const { multiVoice, castVoices } = await chrome.storage.local.get([
+          "multiVoice",
+          "castVoices",
+        ]);
         await ensureOffscreen();
         await chrome.runtime.sendMessage({
           target: "offscreen",
@@ -356,6 +366,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           url: msg.url,
           title: msg.title,
           startText: msg.startText,
+          multiVoice: multiVoice !== false,
+          cast: castVoices || {},
         });
         return { ok: true };
       })().then(sendResponse, (e) =>
