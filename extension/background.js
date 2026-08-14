@@ -375,6 +375,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false, error: e.message || String(e) })
       );
       return true;
+    case "pick-start":
+      // Arm the in-page start-point picker on the active tab (all frames).
+      (async () => {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+        if (!tab?.id) throw new Error("No active tab");
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id, allFrames: true },
+          files: ["picker.js"],
+        });
+        await chrome.tabs.sendMessage(tab.id, {
+          target: "bookvoice-pick",
+          cmd: "arm",
+        });
+        return { ok: true };
+      })().then(sendResponse, (e) =>
+        sendResponse({ ok: false, error: e.message || String(e) })
+      );
+      return true;
+    case "read-from-anchor":
+      // The picker was clicked: start reading this tab from the anchor.
+      (async () => {
+        const tabId = sender.tab?.id;
+        if (tabId == null) throw new Error("No sender tab");
+        const { voice, speed } = await chrome.storage.local.get([
+          "voice",
+          "speed",
+        ]);
+        return readTab(tabId, { voice, speed, startText: msg.startText });
+      })().then(sendResponse, (e) =>
+        sendResponse({ ok: false, error: e.message || String(e) })
+      );
+      return true;
     case "read-text":
       // Pre-extracted text from our own pages (PDF reader). The sender tab
       // hosts the highlighter/floater, so highlight events go back to it.

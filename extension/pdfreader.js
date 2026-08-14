@@ -73,6 +73,7 @@ async function renderPdf(source, title) {
   fullText = parts.join("\n");
   setStatus("");
   $("readBtn").disabled = false;
+  $("pickBtnBar").disabled = false;
 }
 
 async function startReading(startText) {
@@ -92,6 +93,66 @@ async function startReading(startText) {
 }
 
 $("readBtn").addEventListener("click", () => startReading());
+
+// "Pick start": highlight the paragraph under the cursor; click starts there.
+let picking = false;
+let pickHover = null;
+const pickStyle = document.createElement("style");
+pickStyle.textContent =
+  ".bv-pick-hover{outline:3px solid #4f7cff;outline-offset:2px;background:rgba(79,124,255,.10);border-radius:4px;}" +
+  ".bv-picking,.bv-picking *{cursor:crosshair !important;}";
+document.head.appendChild(pickStyle);
+
+$("pickBtnBar").addEventListener("click", () => {
+  picking = true;
+  document.documentElement.classList.add("bv-picking");
+  setStatus("Click a paragraph to start reading — Esc to cancel");
+});
+document.addEventListener(
+  "mousemove",
+  (e) => {
+    if (!picking) return;
+    const p = e.target.closest("#content p");
+    if (pickHover !== p) {
+      pickHover?.classList.remove("bv-pick-hover");
+      pickHover = p;
+      pickHover?.classList.add("bv-pick-hover");
+    }
+  },
+  true
+);
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!picking) return;
+    const p = e.target.closest("#content p");
+    if (!p) return;
+    e.preventDefault();
+    e.stopPropagation();
+    picking = false;
+    document.documentElement.classList.remove("bv-picking");
+    pickHover?.classList.remove("bv-pick-hover");
+    pickHover = null;
+    setStatus("");
+    let anchor = (p.innerText || "").trim();
+    let sib = p;
+    while (anchor.length < 80 && sib) {
+      sib = sib.nextElementSibling;
+      if (sib) anchor += " " + (sib.innerText || "").trim();
+    }
+    startReading(anchor.replace(/\s+/g, " ").slice(0, 240));
+  },
+  true
+);
+document.addEventListener("keydown", (e) => {
+  if (picking && e.key === "Escape") {
+    picking = false;
+    document.documentElement.classList.remove("bv-picking");
+    pickHover?.classList.remove("bv-pick-hover");
+    pickHover = null;
+    setStatus("");
+  }
+});
 
 // "Read from here" support: remember the last right-clicked paragraph; the
 // background routes the context-menu click to us (content scripts and

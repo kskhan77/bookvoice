@@ -122,6 +122,12 @@ $("mvChk").addEventListener("change", (e) => {
 });
 $("read").addEventListener("click", () => startReading());
 $("resume").addEventListener("click", () => startReading({ resume: true }));
+$("pick").addEventListener("click", async () => {
+  prefs(); // persist current voice/speed for the picked read
+  const r = await send("pick-start");
+  if (r?.ok) window.close();
+  else statusEl.textContent = "⚠ " + (r?.error || "Couldn't start the picker");
+});
 pauseBtn.addEventListener("click", () => send(paused ? "resume" : "pause"));
 $("stop").addEventListener("click", () => send("stop"));
 
