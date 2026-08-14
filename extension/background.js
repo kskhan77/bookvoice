@@ -147,7 +147,10 @@ async function readTab(
     );
   }
 
-  let resumeIndex = 0;
+  // null (not 0!) when no explicit position: the engine only honors the
+  // startText anchor when resumeIndex is absent, so a default of 0 silently
+  // discarded every read-from-here anchor.
+  let resumeIndex = null;
   const hash = textHash(best.text);
   if (typeof startIndex === "number") {
     resumeIndex = startIndex;
