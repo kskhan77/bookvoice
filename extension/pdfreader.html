@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>BookVoice PDF Reader</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0;
+        background: #f2f0eb;
+        color: #222;
+      }
+      #bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #1b1d22;
+        color: #e8e8ea;
+        padding: 10px 18px;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      #bar .title {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 600;
+      }
+      #bar button {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #4f7cff;
+        color: #fff;
+      }
+      #bar .note {
+        color: #a5a8b0;
+        font-size: 12px;
+      }
+      #content {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 34px 28px 120px;
+        line-height: 1.7;
+        font-size: 19px;
+      }
+      .pageMark {
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+        color: #8a877f;
+        border-bottom: 1px solid #dcd8cf;
+        margin: 34px 0 16px;
+        padding-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+      #content p {
+        margin: 0 0 14px;
+      }
+      #status {
+        font-family: system-ui, sans-serif;
+        color: #6d6a63;
+        padding: 40px;
+        text-align: center;
+        font-size: 15px;
+      }
+      #filePick {
+        display: none;
+        margin: 24px auto;
+        text-align: center;
+        font-family: system-ui, sans-serif;
+      }
+      #filePick button {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        background: #4f7cff;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      #filePick .tip {
+        color: #6d6a63;
+        font-size: 12.5px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <span>📖 BookVoice</span>
+      <span class="title" id="docTitle">PDF Reader</span>
+      <span class="note">Right-click a paragraph → “Read from here”</span>
+      <button id="readBtn" disabled>▶ Read aloud</button>
+    </div>
+    <div id="status">Loading PDF…</div>
+    <div id="filePick">
+      <button id="pickBtn">Open a PDF file…</button>
+      <div class="tip">
+        Tip: for local files, you can also enable “Allow access to file URLs”
+        for BookVoice on chrome://extensions
+      </div>
+    </div>
+    <div id="content"></div>
+    <input type="file" id="fileInput" accept="application/pdf" hidden />
+    <script type="module" src="pdfreader.js"></script>
+    <script src="highlighter.js"></script>
+    <script src="floater.js"></script>
+  </body>
+</html>

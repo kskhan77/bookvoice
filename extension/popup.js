@@ -154,6 +154,24 @@ refreshDiag();
   loadBookmarks();
   // Offer "Resume" if this page has a saved position.
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // PDFs: Chrome's built-in viewer is closed to extensions, so offer our
+  // own pdf.js-based reader where the full pipeline works.
+  if (
+    tab?.url &&
+    /\.pdf($|[?#])/i.test(tab.url) &&
+    !tab.url.startsWith(chrome.runtime.getURL(""))
+  ) {
+    $("pdfRow").style.display = "";
+    $("pdfBtn").addEventListener("click", () => {
+      chrome.tabs.update(tab.id, {
+        url:
+          chrome.runtime.getURL("pdfreader.html") +
+          "?src=" +
+          encodeURIComponent(tab.url),
+      });
+      window.close();
+    });
+  }
   if (tab?.url) {
     const key = "pos:" + tab.url;
     const pos = (await chrome.storage.local.get(key))[key];

@@ -38,4 +38,10 @@ for (const f of readdirSync(ortDist)) {
     console.log("copied", f);
   }
 }
+
+// pdf.js for the BookVoice PDF reader page (self-contained ESM builds).
+for (const f of ["pdf.min.mjs", "pdf.worker.min.mjs"]) {
+  cpSync(join("node_modules/pdfjs-dist/build", f), join(outDir, f));
+  console.log("copied", f);
+}
 console.log("Build complete -> extension/");

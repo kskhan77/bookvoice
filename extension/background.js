@@ -188,6 +188,18 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== "bv-read-here" || !tab?.id) return;
+  // On our own PDF reader page, scripts can't be injected - the page itself
+  // handles read-from-here.
+  if ((tab.url || "").startsWith(chrome.runtime.getURL(""))) {
+    chrome.tabs
+      .sendMessage(tab.id, {
+        target: "bookvoice-pdfreader",
+        cmd: "read-from-ctx",
+        selectionText: info.selectionText || "",
+      })
+      .catch(() => {});
+    return;
+  }
   try {
     let startText = (info.selectionText || "").trim();
     if (!startText) {
@@ -321,6 +333,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     case "read-bookmark":
       openBookmark(msg.id).then(sendResponse, (e) =>
+        sendResponse({ ok: false, error: e.message || String(e) })
+      );
+      return true;
+    case "read-text":
+      // Pre-extracted text from our own pages (PDF reader). The sender tab
+      // hosts the highlighter/floater, so highlight events go back to it.
+      (async () => {
+        const tabId = sender.tab?.id;
+        if (tabId != null) {
+          await chrome.storage.session.set({
+            hlTarget: { tabId, frameId: 0 },
+          });
+        }
+        await ensureOffscreen();
+        await chrome.runtime.sendMessage({
+          target: "offscreen",
+          cmd: "start",
+          text: msg.text,
+          voice: msg.voice,
+          speed: msg.speed,
+          url: msg.url,
+          title: msg.title,
+          startText: msg.startText,
+        });
+        return { ok: true };
+      })().then(sendResponse, (e) =>
         sendResponse({ ok: false, error: e.message || String(e) })
       );
       return true;

@@ -1,0 +1,150 @@
+// BookVoice PDF reader page. Renders a PDF's text with pdf.js so the normal
+// reading pipeline (TTS, highlighting, floating control, resume) works on
+// PDFs - Chrome's built-in viewer is walled off from extensions.
+import * as pdfjsLib from "./dist/pdf.min.mjs";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL(
+  "dist/pdf.worker.min.mjs"
+);
+
+const $ = (id) => document.getElementById(id);
+let fullText = "";
+
+function setStatus(t) {
+  $("status").textContent = t;
+  $("status").style.display = t ? "" : "none";
+}
+
+// Merge pdf.js's per-visual-line text into readable paragraphs.
+function linesToParagraphs(text) {
+  const lines = text.split("\n").map((l) => l.trim());
+  const paras = [];
+  let cur = "";
+  for (const ln of lines) {
+    if (!ln) {
+      if (cur) {
+        paras.push(cur);
+        cur = "";
+      }
+      continue;
+    }
+    cur = cur ? cur + " " + ln : ln;
+    if (/[.!?]["')\]]?$/.test(ln) && ln.length < 80) {
+      paras.push(cur);
+      cur = "";
+    }
+  }
+  if (cur) paras.push(cur);
+  return paras;
+}
+
+async function renderPdf(source, title) {
+  setStatus("Loading PDF…");
+  $("filePick").style.display = "none";
+  const doc = await pdfjsLib.getDocument(source).promise;
+  $("docTitle").textContent = title;
+  document.title = title + " — BookVoice";
+  const content = $("content");
+  content.textContent = "";
+  const parts = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    setStatus(`Extracting text — page ${p} of ${doc.numPages}…`);
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    let text = "";
+    for (const item of tc.items) {
+      text += item.str;
+      text += item.hasEOL ? "\n" : " ";
+    }
+    text = text
+      .replace(/-\n(?=[a-z])/g, "") // re-join hyphenated line breaks
+      .replace(/[ \t]+/g, " ");
+    const mark = document.createElement("div");
+    mark.className = "pageMark";
+    mark.textContent = "Page " + p;
+    content.appendChild(mark);
+    for (const para of linesToParagraphs(text)) {
+      const el = document.createElement("p");
+      el.textContent = para;
+      content.appendChild(el);
+      parts.push(para);
+    }
+  }
+  fullText = parts.join("\n");
+  setStatus("");
+  $("readBtn").disabled = false;
+}
+
+async function startReading(startText) {
+  if (!fullText) return;
+  const { voice, speed } = await chrome.storage.local.get(["voice", "speed"]);
+  const r = await chrome.runtime.sendMessage({
+    target: "bg",
+    cmd: "read-text",
+    text: fullText,
+    voice: voice || "af_heart",
+    speed: speed || 1,
+    url: location.href,
+    title: $("docTitle").textContent,
+    startText: startText || null,
+  });
+  if (r && r.ok === false) setStatus("⚠ " + r.error);
+}
+
+$("readBtn").addEventListener("click", () => startReading());
+
+// "Read from here" support: remember the last right-clicked paragraph; the
+// background routes the context-menu click to us (content scripts and
+// scripting injection don't run on extension pages).
+let lastCtxText = "";
+document.addEventListener(
+  "contextmenu",
+  (e) => {
+    let el = e.target;
+    let text = "";
+    while (el && (text = (el.innerText || "").trim()).length < 60) {
+      el = el.parentElement;
+    }
+    lastCtxText = text.slice(0, 200);
+  },
+  true
+);
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.target === "bookvoice-pdfreader" && msg.cmd === "read-from-ctx") {
+    startReading((msg.selectionText || "").trim() || lastCtxText);
+    sendResponse({ ok: true });
+  }
+});
+
+// Boot: load from ?src= URL, or offer a file picker (works for local files
+// without the file-URL permission).
+const src = new URLSearchParams(location.search).get("src");
+(async () => {
+  if (src) {
+    try {
+      const name = decodeURIComponent(
+        (src.split("/").pop() || "Document").split("?")[0]
+      );
+      await renderPdf({ url: src }, name || "Document");
+      return;
+    } catch (e) {
+      setStatus("Couldn't load that PDF automatically: " + (e.message || e));
+    }
+  } else {
+    setStatus("");
+  }
+  $("filePick").style.display = "block";
+})();
+
+$("pickBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const buf = await f.arrayBuffer();
+  try {
+    await renderPdf({ data: buf }, f.name);
+  } catch (err) {
+    setStatus("⚠ " + (err.message || err));
+  }
+});
