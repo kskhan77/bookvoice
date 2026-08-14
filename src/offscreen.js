@@ -660,6 +660,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         return { ok: true };
       case "get-diag":
         return { ok: true, log: diagLog };
+      case "benchmark": {
+        // Real generation timings for the device-check page. Assumes the
+        // model is already loaded (the page preloads first for progress UI).
+        await loadModel();
+        const t0 = performance.now();
+        const a1 = await tts.generate(
+          "This is a quick test of the BookVoice reading engine on your device.",
+          { voice: "af_heart" }
+        );
+        const coldMs = performance.now() - t0;
+        const t1 = performance.now();
+        const a2 = await tts.generate(
+          "Here is a second sentence to measure the true steady reading speed.",
+          { voice: "af_heart" }
+        );
+        const warmMs = performance.now() - t1;
+        diag(
+          `benchmark: cold ${Math.round(coldMs)}ms, warm ${Math.round(warmMs)}ms [${ttsDevice}]`
+        );
+        return {
+          ok: true,
+          device: ttsDevice,
+          coldMs: Math.round(coldMs),
+          coldSecs: a1.audio.length / a1.sampling_rate,
+          warmMs: Math.round(warmMs),
+          warmSecs: a2.audio.length / a2.sampling_rate,
+        };
+      }
       default:
         return { ok: false, error: "unknown command" };
     }

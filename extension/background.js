@@ -205,7 +205,11 @@ async function readTab(
 
 // --- "Read from here" context menu ------------------------------------------
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
+  // First install: show the device compatibility check.
+  if (details.reason === "install") {
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  }
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: "bv-read-here",

@@ -130,6 +130,10 @@ $("pick").addEventListener("click", async () => {
 });
 pauseBtn.addEventListener("click", () => send(paused ? "resume" : "pause"));
 $("stop").addEventListener("click", () => send("stop"));
+$("devCheck").addEventListener("click", (e) => {
+  e.preventDefault();
+  chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+});
 
 $("bookmark").addEventListener("click", async () => {
   const r = await send("bookmark-current");
