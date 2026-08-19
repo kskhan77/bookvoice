@@ -215,8 +215,10 @@ async function retireFeedback() {
 }
 
 $("fbRate").addEventListener("click", async () => {
+  // Hardcoded store id: unpacked/dev copies have a different runtime id,
+  // which would produce a dead link.
   chrome.tabs.create({
-    url: `https://chromewebstore.google.com/detail/${chrome.runtime.id}/reviews`,
+    url: "https://chromewebstore.google.com/detail/booanmolfdknnabhkopafcbkcaifolfo/reviews",
   });
   retireFeedback();
 });
