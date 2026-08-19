@@ -2,9 +2,9 @@
 
 **✦ Crafted by [Khurram Shafique](https://github.com/kskhan77) ✦**
 
-> **Status:** v0.1.0 submitted to the Chrome Web Store — currently under
-> review (August 2026). Until it's published, install by loading the
-> `extension/` folder unpacked (instructions below).
+> **Status:** v0.2.0 submitted to the Chrome Web Store (August 2026).
+> Until it's published, install by loading the `extension/` folder
+> unpacked (instructions below).
 
 Reads web pages and ebooks (EBSCO EPUB viewer, articles, any HTML page) aloud
 with a **natural neural voice** — Kokoro-82M running 100% locally on your GPU

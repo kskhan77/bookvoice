@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BookVoice - Natural Read Aloud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reads web pages and ebooks aloud with a natural neural voice (Kokoro TTS). Runs 100% locally on your GPU.",
   "author": "Khurram Shafique",
   "minimum_chrome_version": "124",
