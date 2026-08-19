@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  * { margin: 0; box-sizing: border-box; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { width: 1280px; height: 800px; overflow: hidden; background: linear-gradient(135deg, #14161c 0%, #1d2436 60%, #24304e 100%); display: flex; align-items: center; padding: 0 60px; gap: 48px; }
+  .left { flex: 1; }
+  h1 { font-size: 44px; font-weight: 800; color: #fff; margin-bottom: 14px; }
+  h1 span { color: #6f95ff; }
+  p.sub { font-size: 20px; color: #b8bfd0; line-height: 1.55; margin-bottom: 30px; }
+  .page { background: #fdfcf8; border-radius: 14px; padding: 34px 38px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  .line { font-family: Georgia, serif; font-size: 18.5px; line-height: 1.7; color: #2a2a2a; margin-bottom: 14px; display: flex; gap: 12px; align-items: baseline; }
+  .who { flex: 0 0 auto; font-family: "Segoe UI", sans-serif; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .3px; }
+  .narr { background: rgba(79,124,255,.15); color: #3757c4; }
+  .man  { background: rgba(93,213,152,.2); color: #1e7a4c; }
+  .young{ background: rgba(255,153,51,.18); color: #b25f10; }
+  .cast { width: 330px; background: #1b1d22; border-radius: 16px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+  .cast h2 { font-size: 13px; color: #a5a8b0; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .name { flex: 1; color: #e8e8ea; font-size: 14.5px; text-transform: capitalize; }
+  .sel { flex: 0 0 150px; background: #2a2d35; color: #e8e8ea; border: 1px solid #3a3e48; border-radius: 7px; padding: 8px 10px; font-size: 12.5px; }
+  .hint { font-size: 11px; color: #6d717c; margin-top: 8px; }
+</style></head>
+<body>
+  <div class="left">
+    <h1>Dialogue gets <span>a cast of voices</span> 🎭</h1>
+    <p class="sub">BookVoice detects who's speaking — interviews, scripts, novels — and gives every character their own voice, with your narrator reading the rest. Recast anyone with one click.</p>
+    <div class="page">
+      <div class="line"><span class="who narr">NARRATOR · Heart</span><span>Once there was a bright young man who was looking for a special kind of manager.</span></div>
+      <div class="line"><span class="who young">YOUNG MAN · Michael</span><span>“Do you take time to work with your people?”</span></div>
+      <div class="line"><span class="who man">MANAGER · George</span><span>“One minute is all it takes,” said the manager, smiling.</span></div>
+      <div class="line"><span class="who young">YOUNG MAN · Michael</span><span>“Then I would very much like to learn how.”</span></div>
+    </div>
+  </div>
+  <div class="cast">
+    <h2>🎭 Cast</h2>
+    <div class="row"><span class="name">manager</span><span class="sel">George (UK male) ▾</span></div>
+    <div class="row"><span class="name">young man</span><span class="sel">Michael (US male) ▾</span></div>
+    <div class="row"><span class="name">visitor</span><span class="sel">Bella (US female) ▾</span></div>
+    <div class="row"><span class="name">elizabeth</span><span class="sel">Emma (UK female) ▾</span></div>
+    <div class="hint">Voice changes apply the next time you press Read</div>
+  </div>
+</body></html>

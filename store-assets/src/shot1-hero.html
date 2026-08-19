@@ -11,7 +11,7 @@
   li { font-size: 20px; color: #d7dcea; margin-bottom: 14px; }
   li::before { content: "✓"; color: #5dd598; font-weight: 800; margin-right: 12px; }
   .popup { width: 330px; background: #1b1d22; border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
-  .popup h2 { font-size: 19px; color: #e8e8ea; margin-bottom: 16px; }
+  .popup h2 { font-size: 19px; color: #e8e8ea; margin-bottom: 16px; display: flex; align-items: baseline; }
   .row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
   .lbl { font-size: 13px; color: #a5a8b0; min-width: 48px; }
   .sel { flex: 1; background: #2a2d35; color: #e8e8ea; border: 1px solid #3a3e48; border-radius: 7px; padding: 9px 10px; font-size: 14px; }
@@ -37,11 +37,14 @@
     </ul>
   </div>
   <div class="popup">
-    <h2>📖 BookVoice</h2>
+    <h2>📖 BookVoice <span style="margin-left:auto;font:italic 400 11px Georgia,serif;color:#d4af37;">✦ Khurram Shafique</span></h2>
     <div class="row"><span class="lbl">Voice</span><span class="sel">Heart (US female) — best &nbsp;▾</span></div>
     <div class="row"><span class="lbl">Speed</span><span class="slider"><span class="fillbar"></span><span class="knob"></span></span><span class="spd">1.2×</span></div>
+    <div class="row" style="font-size:12px;color:#c9ccd4;gap:6px">☑ 🔍 Enlarge sentence &nbsp;&nbsp; ☑ 🎭 Multi-voice</div>
     <div class="row"><span class="btn primary">▶ Read page</span></div>
+    <div class="row"><span class="btn">🎯 Start from a spot on the page</span></div>
     <div class="row"><span class="btn">⏸ Pause</span><span class="btn">⏹ Stop</span></div>
+    <div class="row"><span class="btn">🔖 Bookmark this spot</span></div>
     <div class="status">Reading — part 12 of 42 · GPU</div>
     <div class="bar"><div></div></div>
   </div>

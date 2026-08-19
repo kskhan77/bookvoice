@@ -74,14 +74,66 @@ public - a GitHub repository README/gist works fine - and paste its URL.
 
 ## Step 5 — Graphics assets (ready in `store-assets/`)
 
-- **Screenshots (1280x800):** upload all three —
-  `store-assets/shot1-hero.png`, `store-assets/shot2-highlight.png`,
-  `store-assets/shot3-privacy.png`
+- **Screenshots (1280x800, max 5):** upload all five, in this order —
+  1. `store-assets/shot1-hero.png` (popup + headline)
+  2. `store-assets/shot4-multivoice.png` (dialogue cast - headline feature)
+  3. `store-assets/shot2-highlight.png` (follow-along highlighting)
+  4. `store-assets/shot5-pdf.png` (built-in PDF reader)
+  5. `store-assets/shot3-privacy.png` (private by design)
 - **Small promo tile (440x280):** `store-assets/tile-small.png`
-- Optional extra: add a real screenshot of BookVoice reading an actual page
-  (Win+Shift+S, crop to 1280x800) — real-usage shots build trust.
+- Optional extra: swap one for a real screenshot of BookVoice reading an
+  actual page - real-usage shots build trust.
 - To tweak these images: edit the HTML in `store-assets/src/` and re-render
   with headless Chrome (see the command in the repo history or ask).
+
+## v0.2.0 listing description (paste into Description)
+
+Tired of robotic read-aloud voices? BookVoice reads any web page, article,
+online ebook (EPUB viewers like EBSCO and library readers), or PDF with a
+genuinely natural neural voice - powered by the open-source Kokoro AI voice
+model running entirely on YOUR device.
+
+WHY BOOKVOICE
+- 7 natural voices (US & UK, male & female), adjustable speed (0.5x-2x)
+- Multi-voice dialogue: interviews, scripts, and novels get a full cast -
+  each character speaks in their own voice, with a Cast panel to recast
+  anyone in one click
+- Live follow-along: the sentence being read is highlighted (and gently
+  enlarged), the spoken word sweeps in yellow, and the page scrolls itself
+- Start anywhere: pick any paragraph visually and reading begins right there
+- Bookmarks & resume: save your spot in any book and continue with one click
+- Floating on-page control: pause, skip a sentence, or stop without opening
+  the popup
+- Built-in PDF reader: open any PDF (web or local file) and every feature
+  works there too
+- Clean reading: article extraction drops ads, menus, cookie banners, and
+  footnote clutter before a single word is spoken
+
+PRIVATE BY DESIGN
+- 100% local: nothing you read ever leaves your computer
+- No account, no API keys, no telemetry - free forever
+- Works offline after the one-time voice model download (~330 MB)
+- Uses your GPU (WebGPU) when available; falls back to CPU automatically
+- A device compatibility check on install tells you upfront how well your
+  hardware will handle it
+
+GETTING STARTED
+1. Open any article, ebook, or PDF
+2. Click the BookVoice icon
+3. Pick a voice and press Read page - or use "Start from a spot on the
+   page" and click exactly where you want to begin
+
+NOTE
+Chrome's built-in PDF viewer is closed to extensions - use the "Open in
+BookVoice PDF Reader" button the popup offers on PDFs. Ebook viewers load
+one section at a time, so start each new chapter when the previous ends.
+
+## v0.2.0 new permission justification (Privacy tab)
+
+contextMenus:
+Adds a "BookVoice: Read from here" option to the right-click menu so the
+user can start reading aloud from a chosen paragraph. Used only when the
+user clicks that menu item.
 
 ## Step 6 — Visibility and submit
 
