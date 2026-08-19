@@ -191,6 +191,48 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.target === "status-broadcast") render(msg.status);
 });
 
+// ---- Feedback ask: only after real use, never nagging -----------------------
+// Shows after 8 reading sessions; "Later" snoozes a week (3 snoozes = never);
+// rating or leaving feedback retires it permanently.
+async function maybeShowFeedback() {
+  const { readsStarted = 0, fb = {} } = await chrome.storage.local.get([
+    "readsStarted",
+    "fb",
+  ]);
+  if (fb.done || readsStarted < 8) return;
+  if (fb.snoozeUntil && Date.now() < fb.snoozeUntil) return;
+  $("fbText").textContent =
+    `You've started ${readsStarted} reads with BookVoice — enjoying it? ` +
+    "A quick review helps other readers find it. 💛";
+  $("fbCard").style.display = "block";
+}
+
+async function retireFeedback() {
+  const { fb = {} } = await chrome.storage.local.get("fb");
+  fb.done = true;
+  await chrome.storage.local.set({ fb });
+  $("fbCard").style.display = "none";
+}
+
+$("fbRate").addEventListener("click", async () => {
+  chrome.tabs.create({
+    url: `https://chromewebstore.google.com/detail/${chrome.runtime.id}/reviews`,
+  });
+  retireFeedback();
+});
+$("fbIssue").addEventListener("click", async () => {
+  chrome.tabs.create({ url: "https://github.com/kskhan77/bookvoice/issues" });
+  retireFeedback();
+});
+$("fbLater").addEventListener("click", async () => {
+  const { fb = {} } = await chrome.storage.local.get("fb");
+  fb.laters = (fb.laters || 0) + 1;
+  if (fb.laters >= 3) fb.done = true; // they said Later three times: stop asking
+  fb.snoozeUntil = Date.now() + 7 * 24 * 3600 * 1000;
+  await chrome.storage.local.set({ fb });
+  $("fbCard").style.display = "none";
+});
+
 async function refreshDiag() {
   try {
     const r = await send("get-diag");
@@ -218,6 +260,7 @@ refreshDiag();
   // Warm up the model in the background so the first Read is fast.
   send("preload");
   loadBookmarks();
+  maybeShowFeedback();
   // Offer "Resume" if this page has a saved position.
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   // PDFs: Chrome's built-in viewer is closed to extensions, so offer our

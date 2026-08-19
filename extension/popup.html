@@ -89,6 +89,37 @@
         background: #4f7cff;
         transition: width 0.3s;
       }
+      #fbCard {
+        display: none;
+        background: linear-gradient(
+          135deg,
+          rgba(212, 175, 55, 0.1),
+          rgba(79, 124, 255, 0.08)
+        );
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        border-radius: 10px;
+        padding: 12px;
+        margin-top: 12px;
+      }
+      #fbCard .fbText {
+        font-size: 12.5px;
+        color: #e8e8ea;
+        line-height: 1.45;
+        margin-bottom: 10px;
+      }
+      #fbCard .fbRow {
+        display: flex;
+        gap: 6px;
+      }
+      #fbCard button {
+        flex: 1;
+        padding: 7px 4px;
+        font-size: 11.5px;
+      }
+      #fbRate {
+        background: #d4af37;
+        color: #1b1d22;
+      }
       .author-link {
         margin-left: auto;
         font-family: Georgia, "Times New Roman", serif;
@@ -264,6 +295,16 @@
     <div id="bmSection" style="display: none">
       <h2>Bookmarks</h2>
       <div id="bmList"></div>
+    </div>
+    <div id="fbCard">
+      <div class="fbText" id="fbText">
+        Enjoying BookVoice? A quick review helps other readers find it. 💛
+      </div>
+      <div class="fbRow">
+        <button id="fbRate">⭐ Rate it</button>
+        <button id="fbIssue">💬 Feedback</button>
+        <button id="fbLater">Later</button>
+      </div>
     </div>
     <div style="margin-top: 8px; text-align: center">
       <a

@@ -3,6 +3,17 @@
 
 let lastStatus = { state: "idle" };
 
+// Count reading sessions; the popup asks for a review after enough of them.
+async function bumpReadCount() {
+  const { readsStarted = 0 } = await chrome.storage.local.get("readsStarted");
+  chrome.storage.local.set({ readsStarted: readsStarted + 1 });
+}
+
+// Honest exit-interview: opens if the user ever uninstalls.
+chrome.runtime.setUninstallURL(
+  "https://github.com/kskhan77/bookvoice/issues/new?title=Feedback%3A%20why%20I%20uninstalled&body=BookVoice%20didn%27t%20work%20out%20for%20me%20because%3A%0A%0A"
+);
+
 async function ensureOffscreen() {
   const contexts = await chrome.runtime.getContexts({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
@@ -182,6 +193,7 @@ async function readTab(
   await chrome.storage.session.set({
     hlTarget: { tabId, frameId: best.frameId },
   });
+  bumpReadCount();
   const { multiVoice, castVoices } = await chrome.storage.local.get([
     "multiVoice",
     "castVoices",
@@ -427,6 +439,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             hlTarget: { tabId, frameId: 0 },
           });
         }
+        bumpReadCount();
         const { multiVoice, castVoices } = await chrome.storage.local.get([
           "multiVoice",
           "castVoices",
