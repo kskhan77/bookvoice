@@ -88,6 +88,27 @@
     true
   );
 
+  function toast(text, ms) {
+    const t = document.createElement("div");
+    t.textContent = text;
+    Object.assign(t.style, {
+      position: "fixed",
+      top: "14px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: "2147483647",
+      background: "#1b1d22",
+      color: "#e8e8ea",
+      padding: "10px 18px",
+      borderRadius: "999px",
+      font: "600 13px system-ui, sans-serif",
+      boxShadow: "0 6px 24px rgba(0,0,0,.4)",
+      pointerEvents: "none",
+    });
+    document.documentElement.appendChild(t);
+    setTimeout(() => t.remove(), ms);
+  }
+
   document.addEventListener(
     "click",
     (e) => {
@@ -98,9 +119,12 @@
       const startText = block ? anchorFrom(block) : "";
       disarm();
       if (startText) {
+        toast("▶ Starting from this paragraph…", 4000);
         chrome.runtime
           .sendMessage({ target: "bg", cmd: "read-from-anchor", startText })
           .catch(() => {});
+      } else {
+        toast("Couldn't read that spot — click on a text paragraph", 3000);
       }
     },
     true

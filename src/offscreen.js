@@ -565,11 +565,28 @@ async function startReading({
   // "Read from here": find the chunk containing the right-clicked text.
   let fromText = null;
   if (startText && resumeIndex == null) {
+    // Start-from-here must be precise: clear any saved position for this
+    // page so stored state can never influence where reading begins.
+    if (url) {
+      chrome.runtime
+        .sendMessage({ target: "bg", cmd: "clear-pos", url })
+        .catch(() => {});
+    }
     const r = findStartChunk(chunks, startText);
     fromText = r.index;
     diag(
       `read-from-here: "${(r.needle || "").slice(0, 24)}…" ${r.index != null ? "found at chunk " + r.index : "NOT FOUND"}`
     );
+    if (fromText == null) {
+      // Never silently read from the top when the user picked a spot -
+      // being wrong loudly beats being wrong quietly.
+      broadcast({
+        state: "error",
+        error:
+          "Couldn't locate that spot in the page text. Try clicking a longer paragraph, or use Read page.",
+      });
+      return;
+    }
   }
   const startAt = Math.min(
     Math.max(0, fromText ?? resumeIndex ?? 0),

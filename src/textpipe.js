@@ -274,18 +274,25 @@ export function textHash(t) {
 
 // Locate the chunk containing an anchor text (read-from-here). Compares
 // letters/digits only: dialogue chunks drop quote marks and cleanup drops
-// footnote markers, so punctuation can't be trusted to match.
+// footnote markers, so punctuation can't be trusted to match. Tries
+// progressively shorter needles so minor extraction differences near the
+// anchor's tail can't sink the match.
 export function findStartChunk(chunks, startText) {
   const strip = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-  const needle = strip(startText).slice(0, 60);
-  if (needle.length < 12) return { index: null, needle };
+  const full = strip(startText);
   let acc = "";
   const bounds = chunks.map((c) => {
     const s = acc.length;
     acc += strip(c.t);
     return { s, e: acc.length };
   });
-  const hit = acc.indexOf(needle);
-  if (hit < 0) return { index: null, needle };
-  return { index: bounds.findIndex((b) => hit < b.e), needle };
+  for (const len of [60, 36, 20, 12]) {
+    const needle = full.slice(0, len);
+    if (needle.length < Math.min(12, len)) continue;
+    const hit = acc.indexOf(needle);
+    if (hit >= 0) {
+      return { index: bounds.findIndex((b) => hit < b.e), needle };
+    }
+  }
+  return { index: null, needle: full.slice(0, 60) };
 }
